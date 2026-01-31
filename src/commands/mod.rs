@@ -1,0 +1,127 @@
+//! Módulo de comandos CLI.
+
+#[cfg(feature = "cli")]
+use clap::Subcommand;
+use crate::CliConfig;
+
+// Comandos analíticos
+pub mod verify;
+pub mod stats;
+pub mod search;
+pub mod deps;
+pub mod tree;
+
+// Comandos de modificación
+pub mod batch;
+pub mod sync;
+pub mod links;
+
+// Comandos de diagnóstico
+pub mod lint;
+pub mod health;
+pub mod coverage;
+pub mod trace;
+pub mod audit;
+pub mod report;
+pub mod module;
+pub mod watch;
+
+// Comandos de generación
+pub mod gen;
+pub mod template;
+pub mod export;
+pub mod compress;
+
+// Comandos de producción
+pub mod init;
+pub mod migrate;
+pub mod diff;
+pub mod snapshot;
+pub mod restore;
+pub mod archive;
+pub mod ci;
+
+// Comandos de sistema
+pub mod readme;
+pub mod help;
+
+#[cfg(feature = "cli")]
+#[derive(Subcommand, Debug)]
+pub enum Command {
+    // Analíticos
+    Verify(verify::VerifyCommand),
+    Stats(stats::StatsCommand),
+    Search(search::SearchCommand),
+    Deps(deps::DepsCommand),
+    Tree(tree::TreeCommand),
+    
+    // Modificación
+    Batch(batch::BatchCommand),
+    Sync(sync::SyncCommand),
+    Links(links::LinksCommand),
+    
+    // Diagnóstico
+    Lint(lint::LintCommand),
+    Health(health::HealthCommand),
+    Coverage(coverage::CoverageCommand),
+    Trace(trace::TraceCommand),
+    Audit(audit::AuditCommand),
+    Report(report::ReportCommand),
+    Module(module::ModuleCommand),
+    Watch(watch::WatchCommand),
+    
+    // Generación
+    Gen(gen::GenCommand),
+    Template(template::TemplateCommand),
+    Export(export::ExportCommand),
+    Compress(compress::CompressCommand),
+    
+    // Producción
+    Init(init::InitCommand),
+    Migrate(migrate::MigrateCommand),
+    Diff(diff::DiffCommand),
+    Snapshot(snapshot::SnapshotCommand),
+    Restore(restore::RestoreCommand),
+    Archive(archive::ArchiveCommand),
+    Ci(ci::CiCommand),
+    
+    // Sistema
+    Readme(readme::ReadmeCommand),
+    Help(help::HelpCommand),
+}
+
+#[cfg(feature = "cli")]
+pub fn execute(cmd: Command, cli: &CliConfig) -> anyhow::Result<()> {
+    match cmd {
+        Command::Verify(args) => verify::run(args, cli),
+        Command::Stats(args) => stats::run(args, cli),
+        Command::Search(args) => search::run(args, cli),
+        Command::Deps(args) => deps::run(args, cli),
+        Command::Tree(args) => tree::run(args, cli),
+        Command::Batch(args) => batch::run(args, cli),
+        Command::Sync(args) => sync::run(args, cli),
+        Command::Links(args) => links::run(args, cli),
+        Command::Lint(args) => lint::run(args, cli),
+        Command::Health(args) => health::run(args, cli),
+        Command::Coverage(args) => coverage::run(args, cli),
+        Command::Trace(args) => trace::run(args, cli),
+        Command::Audit(args) => audit::run(args, cli),
+        Command::Report(args) => report::run(args, cli),
+        Command::Module(args) => module::run(args, cli),
+        Command::Watch(args) => watch::run(args, cli),
+        Command::Gen(args) => gen::run(args, cli),
+        Command::Template(args) => template::run(args, cli),
+        Command::Export(args) => export::run(args, cli),
+        Command::Compress(args) => compress::run(args, cli),
+        Command::Init(args) => init::run(args, cli),
+        Command::Migrate(args) => migrate::run(args, cli),
+        Command::Diff(args) => diff::run(args, cli),
+        Command::Snapshot(args) => snapshot::run(args, cli),
+        Command::Restore(args) => restore::run(args, cli),
+        Command::Archive(args) => archive::run(args, cli),
+        Command::Ci(args) => ci::run(args, cli),
+        Command::Readme(args) => readme::run(args, cli),
+        Command::Help(args) => help::run(args, cli),
+    }
+}
+
