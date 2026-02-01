@@ -5,11 +5,11 @@
 //! - Validación de documentos contra esquemas
 //! - Sugerencias de corrección automáticas
 
+use crate::core::yaml::YamlFrontmatter;
+use crate::errors::{OcError, OcResult};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
-use serde::{Deserialize, Serialize};
-use crate::errors::{OcError, OcResult};
-use crate::core::yaml::YamlFrontmatter;
 
 /// Tipo de campo esperado.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -60,7 +60,7 @@ impl FieldSpec {
             pattern: None,
         }
     }
-    
+
     pub fn optional(name: impl Into<String>, field_type: FieldType) -> Self {
         Self {
             name: name.into(),
@@ -71,7 +71,7 @@ impl FieldSpec {
             pattern: None,
         }
     }
-    
+
     pub fn with_default(mut self, value: impl Into<String>) -> Self {
         self.default_value = Some(value.into());
         self
@@ -98,23 +98,23 @@ impl SchemaDefinition {
             fields: Vec::new(),
         }
     }
-    
+
     /// Agrega un campo.
     pub fn add_field(mut self, field: FieldSpec) -> Self {
         self.fields.push(field);
         self
     }
-    
+
     /// Campos requeridos.
     pub fn required_fields(&self) -> Vec<&FieldSpec> {
         self.fields.iter().filter(|f| f.required).collect()
     }
-    
+
     /// Campos opcionales.
     pub fn optional_fields(&self) -> Vec<&FieldSpec> {
         self.fields.iter().filter(|f| !f.required).collect()
     }
-    
+
     /// Crea el esquema por defecto de oc_diagdoc.
     pub fn default_oc_schema() -> Self {
         Self::new("oc_diagdoc")
@@ -122,10 +122,19 @@ impl SchemaDefinition {
             .add_field(FieldSpec::required("title", FieldType::String))
             .add_field(FieldSpec::optional("parent", FieldType::String))
             .add_field(FieldSpec::optional("breadcrumb", FieldType::String))
-            .add_field(FieldSpec::optional("status", FieldType::Enum(vec![
-                "draft".into(), "active".into(), "deprecated".into(), 
-                "archived".into(), "reviewed".into(),
-            ])).with_default("draft"))
+            .add_field(
+                FieldSpec::optional(
+                    "status",
+                    FieldType::Enum(vec![
+                        "draft".into(),
+                        "active".into(),
+                        "deprecated".into(),
+                        "archived".into(),
+                        "reviewed".into(),
+                    ]),
+                )
+                .with_default("draft"),
+            )
             .add_field(FieldSpec::optional("created", FieldType::Date))
             .add_field(FieldSpec::optional("last_updated", FieldType::Date))
             .add_field(FieldSpec::optional("author", FieldType::String))
@@ -174,9 +183,12 @@ pub struct ValidationResult {
 
 impl ValidationResult {
     pub fn valid() -> Self {
-        Self { is_valid: true, ..Default::default() }
+        Self {
+            is_valid: true,
+            ..Default::default()
+        }
     }
-    
+
     pub fn add_violation(&mut self, violation: SchemaViolation) {
         self.is_valid = false;
         self.violations.push(violation);
@@ -189,25 +201,27 @@ pub fn validate_frontmatter(
     schema: &SchemaDefinition,
 ) -> ValidationResult {
     let mut result = ValidationResult::valid();
-    
+
     // Convertir frontmatter a mapa para inspección
     let fm_map = frontmatter_to_map(frontmatter);
-    
+
     for field_spec in &schema.fields {
         let field_value = fm_map.get(&field_spec.name);
-        
+
         // Verificar campos requeridos
         if field_spec.required && field_value.is_none() {
             result.add_violation(SchemaViolation {
                 field: field_spec.name.clone(),
                 violation_type: ViolationType::MissingRequired,
                 message: format!("Campo requerido '{}' no encontrado", field_spec.name),
-                suggestion: field_spec.default_value.as_ref()
+                suggestion: field_spec
+                    .default_value
+                    .as_ref()
                     .map(|d| format!("Agregar: {}: {}", field_spec.name, d)),
             });
             continue;
         }
-        
+
         // Verificar tipo si existe valor
         if let Some(value) = field_value {
             if !validate_type(value, &field_spec.field_type) {
@@ -221,7 +235,7 @@ pub fn validate_frontmatter(
                     suggestion: None,
                 });
             }
-            
+
             // Verificar enum
             if let FieldType::Enum(allowed) = &field_spec.field_type {
                 if !allowed.contains(value) {
@@ -237,31 +251,55 @@ pub fn validate_frontmatter(
                 }
             }
         } else if let Some(default) = &field_spec.default_value {
-            result.defaults_applicable.push((field_spec.name.clone(), default.clone()));
+            result
+                .defaults_applicable
+                .push((field_spec.name.clone(), default.clone()));
         }
     }
-    
+
     result
 }
 
 /// Convierte frontmatter a mapa de strings (solo valores no vacíos).
 fn frontmatter_to_map(fm: &YamlFrontmatter) -> HashMap<String, String> {
     let mut map = HashMap::new();
-    
+
     // Solo incluir si no está vacío
-    if !fm.id.is_empty() { map.insert("id".to_string(), fm.id.clone()); }
-    if !fm.title.is_empty() { map.insert("title".to_string(), fm.title.clone()); }
-    
-    if let Some(p) = &fm.parent { map.insert("parent".to_string(), p.clone()); }
-    if !fm.breadcrumb.is_empty() { map.insert("breadcrumb".to_string(), fm.breadcrumb.clone()); }
-    if !fm.status.is_empty() { map.insert("status".to_string(), fm.status.clone()); }
-    if let Some(c) = &fm.created { map.insert("created".to_string(), c.clone()); }
-    if let Some(u) = &fm.last_updated { map.insert("last_updated".to_string(), u.clone()); }
-    if let Some(a) = &fm.author { map.insert("author".to_string(), a.clone()); }
-    if let Some(d) = &fm.domain { map.insert("domain".to_string(), d.clone()); }
-    if let Some(t) = &fm.doc_type { map.insert("doc_type".to_string(), t.clone()); }
-    if let Some(p) = &fm.priority { map.insert("priority".to_string(), p.clone()); }
-    
+    if !fm.id.is_empty() {
+        map.insert("id".to_string(), fm.id.clone());
+    }
+    if !fm.title.is_empty() {
+        map.insert("title".to_string(), fm.title.clone());
+    }
+
+    if let Some(p) = &fm.parent {
+        map.insert("parent".to_string(), p.clone());
+    }
+    if !fm.breadcrumb.is_empty() {
+        map.insert("breadcrumb".to_string(), fm.breadcrumb.clone());
+    }
+    if !fm.status.is_empty() {
+        map.insert("status".to_string(), fm.status.clone());
+    }
+    if let Some(c) = &fm.created {
+        map.insert("created".to_string(), c.clone());
+    }
+    if let Some(u) = &fm.last_updated {
+        map.insert("last_updated".to_string(), u.clone());
+    }
+    if let Some(a) = &fm.author {
+        map.insert("author".to_string(), a.clone());
+    }
+    if let Some(d) = &fm.domain {
+        map.insert("domain".to_string(), d.clone());
+    }
+    if let Some(t) = &fm.doc_type {
+        map.insert("doc_type".to_string(), t.clone());
+    }
+    if let Some(p) = &fm.priority {
+        map.insert("priority".to_string(), p.clone());
+    }
+
     map
 }
 
@@ -275,26 +313,26 @@ fn validate_type(value: &str, expected: &FieldType) -> bool {
             // Formato básico YYYY-MM-DD
             value.len() >= 10 && value.chars().nth(4) == Some('-')
         }
-        FieldType::Array => true, // No validamos contenido aquí
+        FieldType::Array => true,   // No validamos contenido aquí
         FieldType::Enum(_) => true, // Validado aparte
     }
 }
 
 /// Genera sugerencias de corrección.
 pub fn suggest_fixes(violations: &[SchemaViolation]) -> Vec<String> {
-    violations.iter()
+    violations
+        .iter()
         .filter_map(|v| v.suggestion.clone())
         .collect()
 }
 
 /// Carga esquema desde archivo YAML.
 pub fn load_schema(path: impl AsRef<Path>) -> OcResult<SchemaDefinition> {
-    let content = std::fs::read_to_string(path.as_ref())
-        .map_err(|e| OcError::FileRead {
-            path: path.as_ref().to_path_buf(),
-            source: e,
-        })?;
-    
+    let content = std::fs::read_to_string(path.as_ref()).map_err(|e| OcError::FileRead {
+        path: path.as_ref().to_path_buf(),
+        source: e,
+    })?;
+
     serde_yaml::from_str(&content).map_err(|e| OcError::YamlParse {
         path: path.as_ref().to_path_buf(),
         message: e.to_string(),
@@ -321,7 +359,7 @@ mod tests {
             status: "active".to_string(),
             ..Default::default()
         };
-        
+
         let result = validate_frontmatter(&fm, &schema);
         assert!(result.is_valid);
     }
@@ -334,7 +372,7 @@ mod tests {
             title: "Test".to_string(),
             ..Default::default()
         };
-        
+
         let result = validate_frontmatter(&fm, &schema);
         assert!(!result.is_valid);
         assert!(result.violations.iter().any(|v| v.field == "id"));
@@ -349,43 +387,41 @@ mod tests {
             status: "invalid_status".to_string(),
             ..Default::default()
         };
-        
+
         let result = validate_frontmatter(&fm, &schema);
         assert!(!result.is_valid);
-        assert!(result.violations.iter().any(|v| 
-            v.violation_type == ViolationType::InvalidValue
-        ));
+        assert!(result
+            .violations
+            .iter()
+            .any(|v| v.violation_type == ViolationType::InvalidValue));
     }
 
     #[test]
     fn test_defaults_applicable() {
         let schema = SchemaDefinition::new("test")
             .add_field(FieldSpec::required("id", FieldType::String))
-            .add_field(FieldSpec::optional("status", FieldType::String)
-                .with_default("draft"));
-        
+            .add_field(FieldSpec::optional("status", FieldType::String).with_default("draft"));
+
         let fm = YamlFrontmatter {
             id: "1".to_string(),
             title: "Test".to_string(),
             status: String::new(),
             ..Default::default()
         };
-        
+
         let result = validate_frontmatter(&fm, &schema);
         assert!(!result.defaults_applicable.is_empty());
     }
 
     #[test]
     fn test_suggest_fixes() {
-        let violations = vec![
-            SchemaViolation {
-                field: "status".to_string(),
-                violation_type: ViolationType::InvalidValue,
-                message: "Invalid".to_string(),
-                suggestion: Some("Use 'draft'".to_string()),
-            },
-        ];
-        
+        let violations = vec![SchemaViolation {
+            field: "status".to_string(),
+            violation_type: ViolationType::InvalidValue,
+            message: "Invalid".to_string(),
+            suggestion: Some("Use 'draft'".to_string()),
+        }];
+
         let fixes = suggest_fixes(&violations);
         assert_eq!(fixes.len(), 1);
         assert!(fixes[0].contains("draft"));

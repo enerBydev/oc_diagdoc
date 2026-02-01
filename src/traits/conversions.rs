@@ -2,9 +2,9 @@
 //!
 //! Proporciona ergonomía para tipos personalizados.
 
-use std::path::{Path, PathBuf};
 use std::ffi::OsStr;
 use std::ops::Deref;
+use std::path::{Path, PathBuf};
 
 // ═══════════════════════════════════════════════════════════════════════════
 // R23: DATAPATH TRAITS
@@ -20,11 +20,11 @@ impl DataPath {
     pub fn new<P: Into<PathBuf>>(path: P) -> Self {
         Self { inner: path.into() }
     }
-    
+
     pub fn as_path(&self) -> &Path {
         &self.inner
     }
-    
+
     pub fn to_path_buf(&self) -> PathBuf {
         self.inner.clone()
     }
@@ -32,7 +32,7 @@ impl DataPath {
 
 impl Deref for DataPath {
     type Target = Path;
-    
+
     fn deref(&self) -> &Self::Target {
         &self.inner
     }
@@ -58,19 +58,25 @@ impl From<PathBuf> for DataPath {
 
 impl From<&Path> for DataPath {
     fn from(path: &Path) -> Self {
-        Self { inner: path.to_path_buf() }
+        Self {
+            inner: path.to_path_buf(),
+        }
     }
 }
 
 impl From<String> for DataPath {
     fn from(s: String) -> Self {
-        Self { inner: PathBuf::from(s) }
+        Self {
+            inner: PathBuf::from(s),
+        }
     }
 }
 
 impl From<&str> for DataPath {
     fn from(s: &str) -> Self {
-        Self { inner: PathBuf::from(s) }
+        Self {
+            inner: PathBuf::from(s),
+        }
     }
 }
 
@@ -90,7 +96,7 @@ impl HashString {
 
 impl Deref for HashString {
     type Target = str;
-    
+
     fn deref(&self) -> &Self::Target {
         &self.0
     }
@@ -121,26 +127,26 @@ pub struct DocId {
 
 impl DocId {
     pub fn new(parts: Vec<u32>) -> Self {
-        let raw = parts.iter()
+        let raw = parts
+            .iter()
             .map(|p| p.to_string())
             .collect::<Vec<_>>()
             .join(".");
         Self { parts, raw }
     }
-    
+
     pub fn parse(s: &str) -> Result<Self, String> {
-        let parts: Result<Vec<u32>, _> = s.split('.')
-            .map(|p| p.parse::<u32>())
-            .collect();
-        
-        parts.map(Self::new)
+        let parts: Result<Vec<u32>, _> = s.split('.').map(|p| p.parse::<u32>()).collect();
+
+        parts
+            .map(Self::new)
             .map_err(|e| format!("Invalid document ID: {}", e))
     }
-    
+
     pub fn module(&self) -> u32 {
         self.parts.first().copied().unwrap_or(0)
     }
-    
+
     pub fn depth(&self) -> usize {
         self.parts.len()
     }
@@ -166,7 +172,7 @@ impl From<DocId> for String {
 
 impl TryFrom<&str> for DocId {
     type Error = String;
-    
+
     fn try_from(s: &str) -> Result<Self, Self::Error> {
         Self::parse(s)
     }
@@ -196,7 +202,7 @@ where
     T: HasChildren,
 {
     type Item = T;
-    
+
     fn next(&mut self) -> Option<Self::Item> {
         loop {
             match self.inner.next() {
@@ -226,8 +232,8 @@ where
     I: Iterator<Item = T>,
 {
     pub fn new(inner: I, module_id: u32) -> Self {
-        Self { 
-            inner, 
+        Self {
+            inner,
             module_id,
             _phantom: std::marker::PhantomData,
         }
@@ -240,7 +246,7 @@ where
     T: HasModule,
 {
     type Item = T;
-    
+
     fn next(&mut self) -> Option<Self::Item> {
         loop {
             match self.inner.next() {

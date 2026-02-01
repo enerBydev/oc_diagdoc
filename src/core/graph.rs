@@ -5,8 +5,8 @@
 //! - Detección de ciclos
 //! - Análisis de huérfanos y jerarquía
 
-use std::collections::{HashMap, HashSet, VecDeque};
 use crate::types::DocumentId;
+use std::collections::{HashMap, HashSet, VecDeque};
 
 /// Nodo en el grafo de dependencias.
 #[derive(Debug, Clone)]
@@ -46,19 +46,21 @@ impl DependencyGraph {
     pub fn new() -> Self {
         Self::default()
     }
-    
+
     /// Agrega un documento al grafo.
     pub fn add_node(&mut self, id: DocumentId) {
-        self.nodes.entry(id.clone()).or_insert_with(|| GraphNode::new(id));
+        self.nodes
+            .entry(id.clone())
+            .or_insert_with(|| GraphNode::new(id));
     }
-    
+
     /// Agrega un documento con su padre.
     pub fn add_node_with_parent(&mut self, id: DocumentId, parent: Option<DocumentId>) {
         self.add_node(id.clone());
-        
+
         if let Some(parent_id) = parent {
             self.add_node(parent_id.clone());
-            
+
             // Establecer relación padre-hijo
             if let Some(node) = self.nodes.get_mut(&id) {
                 node.parent = Some(parent_id.clone());
@@ -68,12 +70,12 @@ impl DependencyGraph {
             }
         }
     }
-    
+
     /// Agrega un enlace entre documentos.
     pub fn add_link(&mut self, from: DocumentId, to: DocumentId) {
         self.add_node(from.clone());
         self.add_node(to.clone());
-        
+
         if let Some(from_node) = self.nodes.get_mut(&from) {
             from_node.links_to.insert(to.clone());
         }
@@ -81,24 +83,25 @@ impl DependencyGraph {
             to_node.linked_from.insert(from);
         }
     }
-    
+
     /// Obtiene hijos directos de un nodo.
     pub fn get_children(&self, id: &DocumentId) -> Vec<&DocumentId> {
-        self.nodes.get(id)
+        self.nodes
+            .get(id)
             .map(|n| n.children.iter().collect())
             .unwrap_or_default()
     }
-    
+
     /// Obtiene todos los descendientes (recursivo).
     pub fn get_descendants(&self, id: &DocumentId) -> Vec<DocumentId> {
         let mut result = Vec::new();
         let mut queue: VecDeque<DocumentId> = VecDeque::new();
-        
+
         // Agregar hijos iniciales
         if let Some(node) = self.nodes.get(id) {
             queue.extend(node.children.iter().cloned());
         }
-        
+
         while let Some(current) = queue.pop_front() {
             if !result.contains(&current) {
                 result.push(current.clone());
@@ -107,15 +110,15 @@ impl DependencyGraph {
                 }
             }
         }
-        
+
         result
     }
-    
+
     /// Obtiene ancestros (recursivo hacia arriba).
     pub fn get_ancestors(&self, id: &DocumentId) -> Vec<DocumentId> {
         let mut result = Vec::new();
         let mut current = id.clone();
-        
+
         while let Some(node) = self.nodes.get(&current) {
             if let Some(parent) = &node.parent {
                 result.push(parent.clone());
@@ -124,26 +127,26 @@ impl DependencyGraph {
                 break;
             }
         }
-        
+
         result
     }
-    
+
     /// Detecta ciclos en el grafo de enlaces.
     pub fn detect_cycles(&self) -> Vec<Vec<DocumentId>> {
         let mut cycles = Vec::new();
         let mut visited = HashSet::new();
         let mut rec_stack = HashSet::new();
-        
+
         for id in self.nodes.keys() {
             if !visited.contains(id) {
                 let mut path = Vec::new();
                 self.detect_cycles_dfs(id, &mut visited, &mut rec_stack, &mut path, &mut cycles);
             }
         }
-        
+
         cycles
     }
-    
+
     fn detect_cycles_dfs(
         &self,
         id: &DocumentId,
@@ -155,7 +158,7 @@ impl DependencyGraph {
         visited.insert(id.clone());
         rec_stack.insert(id.clone());
         path.push(id.clone());
-        
+
         if let Some(node) = self.nodes.get(id) {
             for neighbor in &node.links_to {
                 if !visited.contains(neighbor) {
@@ -169,70 +172,72 @@ impl DependencyGraph {
                 }
             }
         }
-        
+
         path.pop();
         rec_stack.remove(id);
     }
-    
+
     /// Encuentra documentos huérfanos (sin padre y no son master).
     pub fn orphans(&self) -> Vec<&DocumentId> {
-        self.nodes.values()
+        self.nodes
+            .values()
             .filter(|n| n.parent.is_none() && !n.id.is_master())
             .map(|n| &n.id)
             .collect()
     }
-    
+
     /// Encuentra documentos raíz (sin padre).
     pub fn roots(&self) -> Vec<&DocumentId> {
-        self.nodes.values()
+        self.nodes
+            .values()
             .filter(|n| n.parent.is_none())
             .map(|n| &n.id)
             .collect()
     }
-    
+
     /// Encuentra hojas (sin hijos).
     pub fn leaves(&self) -> Vec<&DocumentId> {
-        self.nodes.values()
+        self.nodes
+            .values()
             .filter(|n| n.children.is_empty())
             .map(|n| &n.id)
             .collect()
     }
-    
+
     /// Cuenta total de nodos.
     pub fn node_count(&self) -> usize {
         self.nodes.len()
     }
-    
+
     /// Cuenta total de enlaces.
     pub fn edge_count(&self) -> usize {
-        self.nodes.values()
-            .map(|n| n.links_to.len())
-            .sum()
+        self.nodes.values().map(|n| n.links_to.len()).sum()
     }
-    
+
     /// Obtiene nodos que referencian a un documento.
     pub fn get_backlinks(&self, id: &DocumentId) -> Vec<&DocumentId> {
-        self.nodes.get(id)
+        self.nodes
+            .get(id)
             .map(|n| n.linked_from.iter().collect())
             .unwrap_or_default()
     }
-    
+
     /// Genera representación Mermaid del grafo.
     pub fn to_mermaid(&self) -> String {
         let mut lines = vec!["graph TD".to_string()];
-        
+
         for node in self.nodes.values() {
             // Enlaces jerárquicos (padre-hijo)
             for child in &node.children {
                 lines.push(format!("    {} --> {}", node.id, child));
             }
-            
+
             // Enlaces de dependencia (punteados)
             for link in &node.links_to {
                 lines.push(format!("    {} -.-> {}", node.id, link));
             }
         }
-        
+
         lines.join("\n")
     }
 }
@@ -250,7 +255,7 @@ mod tests {
         let mut graph = DependencyGraph::new();
         graph.add_node(id("1"));
         graph.add_node(id("1.1"));
-        
+
         assert_eq!(graph.node_count(), 2);
     }
 
@@ -259,7 +264,7 @@ mod tests {
         let mut graph = DependencyGraph::new();
         graph.add_node_with_parent(id("1.1"), Some(id("1")));
         graph.add_node_with_parent(id("1.2"), Some(id("1")));
-        
+
         let children = graph.get_children(&id("1"));
         assert_eq!(children.len(), 2);
     }
@@ -270,7 +275,7 @@ mod tests {
         graph.add_node_with_parent(id("1.1"), Some(id("1")));
         graph.add_node_with_parent(id("1.1.1"), Some(id("1.1")));
         graph.add_node_with_parent(id("1.1.2"), Some(id("1.1")));
-        
+
         let descendants = graph.get_descendants(&id("1"));
         assert_eq!(descendants.len(), 3);
     }
@@ -280,7 +285,7 @@ mod tests {
         let mut graph = DependencyGraph::new();
         graph.add_node_with_parent(id("1.1"), Some(id("1")));
         graph.add_node_with_parent(id("1.1.1"), Some(id("1.1")));
-        
+
         let ancestors = graph.get_ancestors(&id("1.1.1"));
         assert_eq!(ancestors.len(), 2);
         assert!(ancestors.contains(&id("1.1")));
@@ -293,7 +298,7 @@ mod tests {
         graph.add_link(id("1"), id("2"));
         graph.add_link(id("2"), id("3"));
         graph.add_link(id("3"), id("1")); // Ciclo!
-        
+
         let cycles = graph.detect_cycles();
         assert!(!cycles.is_empty());
     }
@@ -303,7 +308,7 @@ mod tests {
         let mut graph = DependencyGraph::new();
         graph.add_link(id("1"), id("2"));
         graph.add_link(id("2"), id("3"));
-        
+
         let cycles = graph.detect_cycles();
         assert!(cycles.is_empty());
     }
@@ -315,7 +320,7 @@ mod tests {
         graph.add_node(id("5")); // Huérfano (no es master, sin padre)
         graph.add_node_with_parent(id("1.1"), Some(id("1")));
         // Nota: id("1") también es huérfano porque no tiene padre definido
-        
+
         let orphans = graph.orphans();
         // "5" y "1" son huérfanos (sin padre y no son master)
         assert_eq!(orphans.len(), 2);
@@ -326,7 +331,7 @@ mod tests {
         let mut graph = DependencyGraph::new();
         graph.add_node_with_parent(id("1.1"), Some(id("1")));
         graph.add_link(id("1"), id("2"));
-        
+
         let mermaid = graph.to_mermaid();
         assert!(mermaid.contains("graph TD"));
         assert!(mermaid.contains("1 --> 1.1"));

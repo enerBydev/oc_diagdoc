@@ -2,25 +2,27 @@
 //!
 //! Exporta todos los tipos y funcionalidades para uso como biblioteca.
 
-pub mod errors;
-pub mod types;
+pub mod commands;
 pub mod core;
 pub mod data;
+pub mod errors;
 pub mod quantum;
-pub mod ui;
-pub mod traits;
-pub mod commands;
 pub mod testing;
+pub mod traits;
+pub mod types;
+pub mod ui;
 
 #[macro_use]
 pub mod macros;
 
 // Re-exports principales
-pub use errors::{OcError, OcResult};
-pub use types::{DocumentId, ModuleId, DocumentStatus, DocumentType, Breadcrumb, OcDate, ContentHash};
 pub use core::config::OcConfig;
 pub use data::document::Document;
 pub use data::project::ProjectState;
+pub use errors::{OcError, OcResult};
+pub use types::{
+    Breadcrumb, ContentHash, DocumentId, DocumentStatus, DocumentType, ModuleId, OcDate,
+};
 
 /// Configuración CLI común.
 #[derive(Debug, Clone)]

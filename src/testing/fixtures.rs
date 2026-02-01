@@ -20,23 +20,28 @@ impl TestProject {
         let temp_dir = TempDir::new()?;
         let data_dir = temp_dir.path().join("Datos");
         std::fs::create_dir_all(&data_dir)?;
-        
+
         Ok(Self { temp_dir, data_dir })
     }
-    
+
     pub fn create_module(&self, module_num: u32) -> std::io::Result<PathBuf> {
         let module_dir = self.data_dir.join(format!("Módulo {}", module_num));
         std::fs::create_dir_all(&module_dir)?;
         Ok(module_dir)
     }
-    
-    pub fn create_document(&self, module: u32, doc_id: &str, content: &str) -> std::io::Result<PathBuf> {
+
+    pub fn create_document(
+        &self,
+        module: u32,
+        doc_id: &str,
+        content: &str,
+    ) -> std::io::Result<PathBuf> {
         let module_dir = self.create_module(module)?;
         let doc_path = module_dir.join(format!("{}.md", doc_id));
         std::fs::write(&doc_path, content)?;
         Ok(doc_path)
     }
-    
+
     pub fn path(&self) -> &std::path::Path {
         self.temp_dir.path()
     }
@@ -50,7 +55,8 @@ impl Default for TestProject {
 
 /// Genera frontmatter válido.
 pub fn sample_frontmatter(title: &str, status: &str) -> String {
-    format!(r#"---
+    format!(
+        r#"---
 id: "1.1"
 title: "{}"
 status: "{}"
@@ -62,12 +68,15 @@ last_updated: "2024-01-01"
 # {}
 
 Contenido de ejemplo.
-"#, title, status, title)
+"#,
+        title, status, title
+    )
 }
 
 /// Genera documento mínimo.
 pub fn minimal_document(id: &str, title: &str) -> String {
-    format!(r#"---
+    format!(
+        r#"---
 id: "{}"
 title: "{}"
 status: "en_progreso"
@@ -75,11 +84,17 @@ doc_type: "documento"
 ---
 
 # {}
-"#, id, title, title)
+"#,
+        id, title, title
+    )
 }
 
 /// Genera múltiples documentos para un módulo.
-pub fn generate_module_docs(project: &TestProject, module: u32, count: usize) -> std::io::Result<Vec<PathBuf>> {
+pub fn generate_module_docs(
+    project: &TestProject,
+    module: u32,
+    count: usize,
+) -> std::io::Result<Vec<PathBuf>> {
     let mut paths = Vec::new();
     for i in 1..=count {
         let doc_id = format!("{}.{}", module, i);
@@ -101,9 +116,14 @@ pub fn assert_file_exists(path: &std::path::Path) {
 
 /// Assert que un archivo contiene texto.
 pub fn assert_file_contains(path: &std::path::Path, text: &str) {
-    let content = std::fs::read_to_string(path)
-        .expect(&format!("Failed to read file: {}", path.display()));
-    assert!(content.contains(text), "File should contain '{}': {}", text, path.display());
+    let content =
+        std::fs::read_to_string(path).expect(&format!("Failed to read file: {}", path.display()));
+    assert!(
+        content.contains(text),
+        "File should contain '{}': {}",
+        text,
+        path.display()
+    );
 }
 
 #[cfg(test)]

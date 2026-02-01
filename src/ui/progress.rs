@@ -5,7 +5,7 @@
 //! - Templates OnlyCar predefinidos
 //! - Spinners y multi-progress
 
-use indicatif::{ProgressBar, ProgressStyle, MultiProgress, ProgressDrawTarget};
+use indicatif::{MultiProgress, ProgressBar, ProgressDrawTarget, ProgressStyle};
 use std::time::Duration;
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -13,20 +13,18 @@ use std::time::Duration;
 // ═══════════════════════════════════════════════════════════════════════════
 
 /// Template estándar de barra de progreso.
-pub const TEMPLATE_STANDARD: &str = 
+pub const TEMPLATE_STANDARD: &str =
     "{spinner:.cyan} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} ({percent}%) {msg}";
 
 /// Template compacto.
-pub const TEMPLATE_COMPACT: &str = 
-    "{spinner:.cyan} {bar:30.cyan/blue} {pos}/{len} {msg}";
+pub const TEMPLATE_COMPACT: &str = "{spinner:.cyan} {bar:30.cyan/blue} {pos}/{len} {msg}";
 
 /// Template para bytes/archivos.
-pub const TEMPLATE_BYTES: &str = 
+pub const TEMPLATE_BYTES: &str =
     "{spinner:.green} [{bar:40.green/white}] {bytes}/{total_bytes} ({bytes_per_sec}) {msg}";
 
 /// Template de spinner.
-pub const TEMPLATE_SPINNER: &str = 
-    "{spinner:.cyan} {msg}";
+pub const TEMPLATE_SPINNER: &str = "{spinner:.cyan} {msg}";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // CREACIÓN DE BARRAS DE PROGRESO
@@ -39,7 +37,7 @@ pub fn create_progress_bar(total: u64) -> ProgressBar {
         ProgressStyle::default_bar()
             .template(TEMPLATE_STANDARD)
             .unwrap()
-            .progress_chars("█▓▒░ ")
+            .progress_chars("█▓▒░ "),
     );
     pb.enable_steady_tick(Duration::from_millis(100));
     pb
@@ -52,7 +50,7 @@ pub fn create_progress_bar_with_template(total: u64, template: &str) -> Progress
         ProgressStyle::default_bar()
             .template(template)
             .unwrap()
-            .progress_chars("█▓▒░ ")
+            .progress_chars("█▓▒░ "),
     );
     pb.enable_steady_tick(Duration::from_millis(100));
     pb
@@ -79,7 +77,7 @@ pub fn create_spinner(msg: &str) -> ProgressBar {
         ProgressStyle::default_spinner()
             .template(TEMPLATE_SPINNER)
             .unwrap()
-            .tick_chars("⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏ ")
+            .tick_chars("⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏ "),
     );
     spinner.set_message(msg.to_string());
     spinner.enable_steady_tick(Duration::from_millis(80));
@@ -93,7 +91,7 @@ pub fn create_dots_spinner(msg: &str) -> ProgressBar {
         ProgressStyle::default_spinner()
             .template("{spinner:.cyan} {msg}")
             .unwrap()
-            .tick_chars("⣾⣽⣻⢿⡿⣟⣯⣷ ")
+            .tick_chars("⣾⣽⣻⢿⡿⣟⣯⣷ "),
     );
     spinner.set_message(msg.to_string());
     spinner.enable_steady_tick(Duration::from_millis(80));

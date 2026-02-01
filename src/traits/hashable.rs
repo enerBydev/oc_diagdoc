@@ -2,9 +2,9 @@
 //!
 //! Proporciona hashing determinístico para objetos.
 
-use std::hash::{Hash, Hasher};
-use std::collections::hash_map::DefaultHasher;
 use crate::types::ContentHash;
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TRAIT HASHABLE
@@ -14,17 +14,17 @@ use crate::types::ContentHash;
 pub trait Hashable {
     /// Genera contenido para hashear.
     fn hash_content(&self) -> Vec<u8>;
-    
+
     /// Calcula hash del contenido.
     fn compute_hash(&self) -> ContentHash {
         ContentHash::from_bytes(&self.hash_content())
     }
-    
+
     /// Verifica si el hash coincide.
     fn verify_hash(&self, expected: &ContentHash) -> bool {
         &self.compute_hash() == expected
     }
-    
+
     /// Hash rápido como u64.
     fn quick_hash(&self) -> u64 {
         let mut hasher = DefaultHasher::new();
@@ -68,7 +68,7 @@ mod tests {
         let s1 = "hello".to_string();
         let s2 = "hello".to_string();
         let s3 = "world".to_string();
-        
+
         assert_eq!(s1.quick_hash(), s2.quick_hash());
         assert_ne!(s1.quick_hash(), s3.quick_hash());
     }

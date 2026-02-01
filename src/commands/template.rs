@@ -2,10 +2,10 @@
 //!
 //! Lista, crea y administra templates de documentos.
 
-use std::path::PathBuf;
+use crate::errors::OcResult;
 use clap::Parser;
 use serde::Serialize;
-use crate::errors::OcResult;
+use std::path::PathBuf;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TEMPLATE TYPES
@@ -45,7 +45,7 @@ impl TemplateResult {
             action: "list".to_string(),
         }
     }
-    
+
     pub fn created(template: TemplateInfo) -> Self {
         Self {
             templates: vec![template],
@@ -64,15 +64,15 @@ impl TemplateResult {
 pub struct TemplateCommand {
     /// Nombre del template.
     pub name: Option<String>,
-    
+
     /// Listar templates.
     #[arg(short, long)]
     pub list: bool,
-    
+
     /// Crear nuevo template.
     #[arg(short, long)]
     pub create: bool,
-    
+
     /// Ruta del template.
     #[arg(short, long)]
     pub path: Option<PathBuf>,
@@ -92,7 +92,9 @@ impl TemplateCommand {
             // Crear template
             let info = TemplateInfo::new(
                 self.name.as_deref().unwrap_or("new"),
-                self.path.clone().unwrap_or_else(|| PathBuf::from("templates/new.md")),
+                self.path
+                    .clone()
+                    .unwrap_or_else(|| PathBuf::from("templates/new.md")),
             );
             Ok(TemplateResult::created(info))
         }
@@ -139,7 +141,7 @@ mod tests {
 #[cfg(feature = "cli")]
 pub fn run(cmd: TemplateCommand, _cli: &crate::commands::CliConfig) -> anyhow::Result<()> {
     let result = cmd.run()?;
-    
+
     if result.action == "list" {
         println!("📋 Templates disponibles:\n");
         for t in &result.templates {
@@ -148,6 +150,6 @@ pub fn run(cmd: TemplateCommand, _cli: &crate::commands::CliConfig) -> anyhow::R
     } else {
         println!("✅ Template creado: {}", result.templates[0].name);
     }
-    
+
     Ok(())
 }

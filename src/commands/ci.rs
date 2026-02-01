@@ -2,10 +2,10 @@
 //!
 //! Ejecuta verificaciones para CI/CD.
 
-use std::path::PathBuf;
+use crate::errors::OcResult;
 use clap::Parser;
 use serde::Serialize;
-use crate::errors::OcResult;
+use std::path::PathBuf;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // CI TYPES
@@ -29,7 +29,7 @@ impl CiCheck {
             duration_ms,
         }
     }
-    
+
     pub fn fail(name: &str, message: &str, duration_ms: u64) -> Self {
         Self {
             name: name.to_string(),
@@ -56,7 +56,7 @@ impl CiResult {
             total_duration_ms: 0,
         }
     }
-    
+
     pub fn add_check(&mut self, check: CiCheck) {
         self.total_duration_ms += check.duration_ms;
         if !check.passed {
@@ -64,9 +64,13 @@ impl CiResult {
         }
         self.checks.push(check);
     }
-    
+
     pub fn exit_code(&self) -> i32 {
-        if self.all_passed { 0 } else { 1 }
+        if self.all_passed {
+            0
+        } else {
+            1
+        }
     }
 }
 
@@ -87,11 +91,11 @@ pub struct CiCommand {
     /// Ruta del proyecto.
     #[arg(short, long)]
     pub path: Option<PathBuf>,
-    
+
     /// Modo estricto.
     #[arg(long)]
     pub strict: bool,
-    
+
     /// Output JSON.
     #[arg(long)]
     pub json: bool,
@@ -100,11 +104,11 @@ pub struct CiCommand {
 impl CiCommand {
     pub fn run(&self) -> OcResult<CiResult> {
         let mut result = CiResult::new();
-        
+
         result.add_check(CiCheck::pass("lint", "No issues", 50));
         result.add_check(CiCheck::pass("schema", "Valid", 30));
         result.add_check(CiCheck::pass("links", "All valid", 100));
-        
+
         Ok(result)
     }
 }
@@ -130,7 +134,7 @@ mod tests {
         let mut result = CiResult::new();
         result.add_check(CiCheck::pass("a", "ok", 10));
         result.add_check(CiCheck::pass("b", "ok", 10));
-        
+
         assert!(result.all_passed);
         assert_eq!(result.exit_code(), 0);
     }
@@ -140,7 +144,7 @@ mod tests {
         let mut result = CiResult::new();
         result.add_check(CiCheck::pass("a", "ok", 10));
         result.add_check(CiCheck::fail("b", "error", 10));
-        
+
         assert!(!result.all_passed);
         assert_eq!(result.exit_code(), 1);
     }
@@ -150,14 +154,18 @@ mod tests {
 #[cfg(feature = "cli")]
 pub fn run(cmd: CiCommand, _cli: &crate::commands::CliConfig) -> anyhow::Result<()> {
     let result = cmd.run()?;
-    
+
     for check in &result.checks {
         let icon = if check.passed { "✅" } else { "❌" };
         println!("{} {} ({}ms)", icon, check.name, check.duration_ms);
     }
-    
-    let status = if result.all_passed { "PASSED" } else { "FAILED" };
+
+    let status = if result.all_passed {
+        "PASSED"
+    } else {
+        "FAILED"
+    };
     println!("\n🏁 CI {}: {}ms total", status, result.total_duration_ms);
-    
+
     std::process::exit(result.exit_code());
 }

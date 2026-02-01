@@ -5,11 +5,11 @@
 //! - Logger configurable
 //! - Output a stderr para compatibilidad con pipes
 
+use colored::Colorize;
 use std::io::{self, Write};
 use std::sync::atomic::{AtomicU8, Ordering};
-use colored::Colorize;
 
-use crate::ui::theme::{emoji, success, warning, error, info};
+use crate::ui::theme::{emoji, error, info, success, warning};
 
 // ═══════════════════════════════════════════════════════════════════════════
 // NIVEL DE LOG
@@ -153,32 +153,32 @@ impl Logger {
     pub fn new() -> Self {
         Self::default()
     }
-    
+
     /// Con prefijo.
     pub fn with_prefix(mut self, prefix: impl Into<String>) -> Self {
         self.prefix = Some(prefix.into());
         self
     }
-    
+
     /// Con nivel.
     pub fn with_level(mut self, level: LogLevel) -> Self {
         self.level = level;
         self
     }
-    
+
     /// Usa stdout en lugar de stderr.
     pub fn use_stdout(mut self) -> Self {
         self.use_stderr = false;
         self
     }
-    
+
     fn format_msg(&self, msg: &str) -> String {
         match &self.prefix {
             Some(p) => format!("[{}] {}", p, msg),
             None => msg.to_string(),
         }
     }
-    
+
     fn write(&self, msg: &str) {
         if self.use_stderr {
             let _ = writeln!(io::stderr(), "{}", msg);
@@ -186,39 +186,59 @@ impl Logger {
             println!("{}", msg);
         }
     }
-    
+
     /// Log info.
     pub fn info(&self, msg: &str) {
         if self.level >= LogLevel::Info {
-            self.write(&format!("{} {}", emoji("info").blue(), self.format_msg(msg)));
+            self.write(&format!(
+                "{} {}",
+                emoji("info").blue(),
+                self.format_msg(msg)
+            ));
         }
     }
-    
+
     /// Log success.
     pub fn success(&self, msg: &str) {
         if self.level >= LogLevel::Info {
-            self.write(&format!("{} {}", emoji("success"), success(&self.format_msg(msg))));
+            self.write(&format!(
+                "{} {}",
+                emoji("success"),
+                success(&self.format_msg(msg))
+            ));
         }
     }
-    
+
     /// Log warning.
     pub fn warning(&self, msg: &str) {
         if self.level >= LogLevel::Warning {
-            self.write(&format!("{} {}", emoji("warning"), warning(&self.format_msg(msg))));
+            self.write(&format!(
+                "{} {}",
+                emoji("warning"),
+                warning(&self.format_msg(msg))
+            ));
         }
     }
-    
+
     /// Log error.
     pub fn error(&self, msg: &str) {
         if self.level >= LogLevel::Error {
-            self.write(&format!("{} {}", emoji("error"), error(&self.format_msg(msg))));
+            self.write(&format!(
+                "{} {}",
+                emoji("error"),
+                error(&self.format_msg(msg))
+            ));
         }
     }
-    
+
     /// Log debug.
     pub fn debug(&self, msg: &str) {
         if self.level >= LogLevel::Debug {
-            self.write(&format!("{} {}", "DEBUG:".bright_black(), self.format_msg(msg).bright_black()));
+            self.write(&format!(
+                "{} {}",
+                "DEBUG:".bright_black(),
+                self.format_msg(msg).bright_black()
+            ));
         }
     }
 }
@@ -276,7 +296,7 @@ mod tests {
         assert!(should_log(LogLevel::Error));
         assert!(should_log(LogLevel::Warning));
         assert!(!should_log(LogLevel::Info));
-        
+
         // Restaurar
         set_log_level(LogLevel::Info);
     }

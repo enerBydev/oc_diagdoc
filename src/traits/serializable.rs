@@ -2,7 +2,7 @@
 //!
 //! Proporciona serialización consistente a múltiples formatos.
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SERIALIZATION FORMAT
@@ -26,22 +26,19 @@ pub enum SerializationFormat {
 pub trait Serializable: Serialize {
     /// Serializa a JSON.
     fn to_json(&self) -> Result<String, String> {
-        serde_json::to_string(self)
-            .map_err(|e| e.to_string())
+        serde_json::to_string(self).map_err(|e| e.to_string())
     }
-    
+
     /// Serializa a JSON pretty.
     fn to_json_pretty(&self) -> Result<String, String> {
-        serde_json::to_string_pretty(self)
-            .map_err(|e| e.to_string())
+        serde_json::to_string_pretty(self).map_err(|e| e.to_string())
     }
-    
+
     /// Serializa a YAML.
     fn to_yaml(&self) -> Result<String, String> {
-        serde_yaml::to_string(self)
-            .map_err(|e| e.to_string())
+        serde_yaml::to_string(self).map_err(|e| e.to_string())
     }
-    
+
     /// Serializa en el formato especificado.
     fn serialize_to(&self, format: SerializationFormat) -> Result<String, String> {
         match format {
@@ -64,14 +61,12 @@ impl<T: Serialize> Serializable for T {}
 pub trait Deserializable: for<'de> Deserialize<'de> + Sized {
     /// Deserializa desde JSON.
     fn from_json(json: &str) -> Result<Self, String> {
-        serde_json::from_str(json)
-            .map_err(|e| e.to_string())
+        serde_json::from_str(json).map_err(|e| e.to_string())
     }
-    
+
     /// Deserializa desde YAML.
     fn from_yaml(yaml: &str) -> Result<Self, String> {
-        serde_yaml::from_str(yaml)
-            .map_err(|e| e.to_string())
+        serde_yaml::from_str(yaml).map_err(|e| e.to_string())
     }
 }
 
@@ -81,7 +76,7 @@ impl<T: for<'de> Deserialize<'de> + Sized> Deserializable for T {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde::{Serialize, Deserialize};
+    use serde::{Deserialize, Serialize};
 
     #[derive(Serialize, Deserialize, Debug, PartialEq)]
     struct TestStruct {
@@ -91,9 +86,12 @@ mod tests {
 
     #[test]
     fn test_to_json() {
-        let obj = TestStruct { name: "test".to_string(), value: 42 };
+        let obj = TestStruct {
+            name: "test".to_string(),
+            value: 42,
+        };
         let json = obj.to_json().unwrap();
-        
+
         assert!(json.contains("test"));
         assert!(json.contains("42"));
     }
@@ -102,16 +100,19 @@ mod tests {
     fn test_from_json() {
         let json = r#"{"name":"test","value":42}"#;
         let obj: TestStruct = TestStruct::from_json(json).unwrap();
-        
+
         assert_eq!(obj.name, "test");
         assert_eq!(obj.value, 42);
     }
 
     #[test]
     fn test_to_yaml() {
-        let obj = TestStruct { name: "test".to_string(), value: 42 };
+        let obj = TestStruct {
+            name: "test".to_string(),
+            value: 42,
+        };
         let yaml = obj.to_yaml().unwrap();
-        
+
         assert!(yaml.contains("name:"));
         assert!(yaml.contains("test"));
     }

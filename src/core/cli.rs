@@ -11,24 +11,28 @@ use std::path::PathBuf;
 
 /// Opciones globales del CLI.
 #[derive(Parser, Debug, Clone)]
-#[command(name = "oc_diagdoc", version = "3.0.0", about = "Sistema de diagnóstico de documentación")]
+#[command(
+    name = "oc_diagdoc",
+    version = "3.0.1",
+    about = "Sistema de diagnóstico de documentación"
+)]
 pub struct CliApp {
     /// Modo verbose.
     #[arg(short, long, global = true)]
     pub verbose: bool,
-    
+
     /// Modo silencioso.
     #[arg(short, long, global = true)]
     pub quiet: bool,
-    
+
     /// Directorio de datos.
     #[arg(short, long, global = true, default_value = "Datos")]
     pub data_dir: PathBuf,
-    
+
     /// Formato de salida (text/json/yaml).
     #[arg(long, global = true, default_value = "text")]
     pub format: String,
-    
+
     /// Archivo de configuración.
     #[arg(short, long, global = true)]
     pub config: Option<PathBuf>,
@@ -38,11 +42,11 @@ impl CliApp {
     pub fn is_json(&self) -> bool {
         self.format == "json"
     }
-    
+
     pub fn is_yaml(&self) -> bool {
         self.format == "yaml"
     }
-    
+
     pub fn is_text(&self) -> bool {
         self.format == "text"
     }
@@ -78,7 +82,7 @@ impl CliResult {
             duration_ms: 0,
         }
     }
-    
+
     pub fn error(code: i32, msg: &str) -> Self {
         Self {
             success: false,
@@ -87,7 +91,7 @@ impl CliResult {
             duration_ms: 0,
         }
     }
-    
+
     pub fn with_duration(mut self, ms: u64) -> Self {
         self.duration_ms = ms;
         self
@@ -110,7 +114,7 @@ impl ExecutionContext {
             args: Vec::new(),
         }
     }
-    
+
     pub fn elapsed_ms(&self) -> u64 {
         self.start_time.elapsed().as_millis() as u64
     }

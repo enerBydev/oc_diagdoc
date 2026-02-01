@@ -1,10 +1,10 @@
 //! Identificadores únicos para documentos y módulos.
 
+use crate::errors::OcError;
+use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::fmt;
 use std::str::FromStr;
-use serde::{Deserialize, Serialize};
-use crate::errors::OcError;
 
 /// Identificador de documento jerárquico.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -16,7 +16,8 @@ pub struct DocumentId {
 impl DocumentId {
     /// Crea nuevo ID desde partes numéricas.
     pub fn new(parts: Vec<u32>) -> Self {
-        let raw = parts.iter()
+        let raw = parts
+            .iter()
             .map(|p| p.to_string())
             .collect::<Vec<_>>()
             .join(".");
@@ -48,7 +49,7 @@ impl DocumentId {
         if self.parts.len() <= 1 {
             None
         } else {
-            Some(Self::new(self.parts[..self.parts.len()-1].to_vec()))
+            Some(Self::new(self.parts[..self.parts.len() - 1].to_vec()))
         }
     }
 
@@ -56,7 +57,7 @@ impl DocumentId {
     pub fn parts(&self) -> &[u32] {
         &self.parts
     }
-    
+
     /// String raw.
     pub fn as_str(&self) -> &str {
         &self.raw
@@ -67,13 +68,13 @@ impl FromStr for DocumentId {
     type Err = OcError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let parts: Result<Vec<u32>, _> = s
-            .split('.')
-            .map(|p| p.parse::<u32>())
-            .collect();
-        
+        let parts: Result<Vec<u32>, _> = s.split('.').map(|p| p.parse::<u32>()).collect();
+
         match parts {
-            Ok(p) if !p.is_empty() => Ok(Self { parts: p, raw: s.to_string() }),
+            Ok(p) if !p.is_empty() => Ok(Self {
+                parts: p,
+                raw: s.to_string(),
+            }),
             _ => Err(OcError::InvalidId(s.to_string())),
         }
     }
@@ -157,7 +158,7 @@ mod tests {
         assert!(a < b);
         assert!(b < c);
     }
-    
+
     #[test]
     fn test_parent() {
         let id: DocumentId = "3.1.2".parse().unwrap();

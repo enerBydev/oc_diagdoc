@@ -20,7 +20,7 @@ impl<'a> DocumentView<'a> {
     pub fn new(id: &'a str, title: &'a str, content: &'a str) -> Self {
         Self { id, title, content }
     }
-    
+
     pub fn word_count(&self) -> usize {
         self.content.split_whitespace().count()
     }
@@ -38,29 +38,33 @@ pub struct LazyString<'a> {
 
 impl<'a> LazyString<'a> {
     pub fn borrowed(s: &'a str) -> Self {
-        Self { inner: Cow::Borrowed(s) }
+        Self {
+            inner: Cow::Borrowed(s),
+        }
     }
-    
+
     pub fn owned(s: String) -> Self {
-        Self { inner: Cow::Owned(s) }
+        Self {
+            inner: Cow::Owned(s),
+        }
     }
-    
+
     pub fn is_borrowed(&self) -> bool {
         matches!(self.inner, Cow::Borrowed(_))
     }
-    
+
     pub fn is_owned(&self) -> bool {
         matches!(self.inner, Cow::Owned(_))
     }
-    
+
     pub fn as_str(&self) -> &str {
         &self.inner
     }
-    
+
     pub fn into_owned(self) -> String {
         self.inner.into_owned()
     }
-    
+
     /// Modifica el string, convirtiendo a owned si es necesario.
     pub fn to_mut(&mut self) -> &mut String {
         self.inner.to_mut()
@@ -93,9 +97,13 @@ pub struct CacheEntry<'a, T> {
 
 impl<'a, T> CacheEntry<'a, T> {
     pub fn new(key: &'a str, value: T) -> Self {
-        Self { key, value, hits: 0 }
+        Self {
+            key,
+            value,
+            hits: 0,
+        }
     }
-    
+
     pub fn hit(&mut self) {
         self.hits += 1;
     }
@@ -116,7 +124,7 @@ impl<'a, 'b> SplitBorrow<'a, 'b> {
     pub fn new(metadata: &'a str, content: &'b str) -> Self {
         Self { metadata, content }
     }
-    
+
     /// Combina ambas partes.
     pub fn combined(&self) -> String {
         format!("{}\n---\n{}", self.metadata, self.content)

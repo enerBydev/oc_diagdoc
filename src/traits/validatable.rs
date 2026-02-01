@@ -39,37 +39,35 @@ pub trait Validatable {
 /// Extensión para colecciones de Validatable.
 pub trait ValidatableCollection {
     type Item: Validatable;
-    
+
     /// Valida todos los elementos.
     fn validate_all_items(&self) -> Vec<OcError>;
-    
+
     /// ¿Todos válidos?
     fn all_valid(&self) -> bool;
-    
+
     /// Cuenta los válidos.
     fn count_valid(&self) -> usize;
-    
+
     /// Cuenta inválidos.
     fn count_invalid(&self) -> usize;
 }
 
 impl<T: Validatable> ValidatableCollection for Vec<T> {
     type Item = T;
-    
+
     fn validate_all_items(&self) -> Vec<OcError> {
-        self.iter()
-            .flat_map(|item| item.validate_all())
-            .collect()
+        self.iter().flat_map(|item| item.validate_all()).collect()
     }
-    
+
     fn all_valid(&self) -> bool {
         self.iter().all(|item| item.is_valid())
     }
-    
+
     fn count_valid(&self) -> usize {
         self.iter().filter(|item| item.is_valid()).count()
     }
-    
+
     fn count_invalid(&self) -> usize {
         self.iter().filter(|item| !item.is_valid()).count()
     }
@@ -77,21 +75,19 @@ impl<T: Validatable> ValidatableCollection for Vec<T> {
 
 impl<T: Validatable> ValidatableCollection for [T] {
     type Item = T;
-    
+
     fn validate_all_items(&self) -> Vec<OcError> {
-        self.iter()
-            .flat_map(|item| item.validate_all())
-            .collect()
+        self.iter().flat_map(|item| item.validate_all()).collect()
     }
-    
+
     fn all_valid(&self) -> bool {
         self.iter().all(|item| item.is_valid())
     }
-    
+
     fn count_valid(&self) -> usize {
         self.iter().filter(|item| item.is_valid()).count()
     }
-    
+
     fn count_invalid(&self) -> usize {
         self.iter().filter(|item| !item.is_valid()).count()
     }
@@ -101,14 +97,18 @@ impl<T: Validatable> ValidatableCollection for [T] {
 mod tests {
     use super::*;
 
-    struct TestItem { valid: bool }
-    
+    struct TestItem {
+        valid: bool,
+    }
+
     impl Validatable for TestItem {
         fn validate(&self) -> Result<(), OcError> {
             if self.valid {
                 Ok(())
             } else {
-                Err(OcError::Validation { message: "invalid".to_string() })
+                Err(OcError::Validation {
+                    message: "invalid".to_string(),
+                })
             }
         }
     }
@@ -117,7 +117,7 @@ mod tests {
     fn test_validatable_is_valid() {
         let valid = TestItem { valid: true };
         let invalid = TestItem { valid: false };
-        
+
         assert!(valid.is_valid());
         assert!(!invalid.is_valid());
     }
@@ -129,7 +129,7 @@ mod tests {
             TestItem { valid: false },
             TestItem { valid: true },
         ];
-        
+
         assert!(!items.all_valid());
         assert_eq!(items.count_valid(), 2);
         assert_eq!(items.count_invalid(), 1);

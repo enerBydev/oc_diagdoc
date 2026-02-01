@@ -18,7 +18,7 @@ impl Counters {
     pub fn new() -> Self {
         Self::default()
     }
-    
+
     /// Promedio de palabras por archivo.
     pub fn avg_words_per_file(&self) -> f64 {
         if self.total_files > 0 {
@@ -54,7 +54,7 @@ impl CoverageStats {
     pub fn new() -> Self {
         Self::default()
     }
-    
+
     /// Clasifica un conteo de palabras.
     pub fn classify(&mut self, word_count: usize) {
         match word_count {
@@ -68,13 +68,19 @@ impl CoverageStats {
             _ => self.acceptable += 1,
         }
     }
-    
+
     /// Total de archivos.
     pub fn total(&self) -> usize {
-        self.critical + self.alert + self.warning + self.low +
-        self.moderate + self.almost + self.pending + self.acceptable
+        self.critical
+            + self.alert
+            + self.warning
+            + self.low
+            + self.moderate
+            + self.almost
+            + self.pending
+            + self.acceptable
     }
-    
+
     /// Porcentaje de aceptables.
     pub fn percent_acceptable(&self) -> f64 {
         let total = self.total();
@@ -84,7 +90,7 @@ impl CoverageStats {
             0.0
         }
     }
-    
+
     /// Porcentaje de críticos.
     pub fn percent_critical(&self) -> f64 {
         let total = self.total();
@@ -94,25 +100,26 @@ impl CoverageStats {
             0.0
         }
     }
-    
+
     /// Score de salud (0-100).
     pub fn health_score(&self) -> u8 {
         let total = self.total() as f64;
         if total == 0.0 {
             return 0;
         }
-        
+
         // Ponderación: aceptables valen más, críticos restan
-        let score = 
-            (self.acceptable as f64 * 1.0 +
-             self.pending as f64 * 0.85 +
-             self.almost as f64 * 0.7 +
-             self.moderate as f64 * 0.55 +
-             self.low as f64 * 0.4 +
-             self.warning as f64 * 0.25 +
-             self.alert as f64 * 0.1 +
-             self.critical as f64 * 0.0) / total * 100.0;
-        
+        let score = (self.acceptable as f64 * 1.0
+            + self.pending as f64 * 0.85
+            + self.almost as f64 * 0.7
+            + self.moderate as f64 * 0.55
+            + self.low as f64 * 0.4
+            + self.warning as f64 * 0.25
+            + self.alert as f64 * 0.1
+            + self.critical as f64 * 0.0)
+            / total
+            * 100.0;
+
         score.round() as u8
     }
 }
@@ -120,20 +127,20 @@ impl CoverageStats {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_coverage_classify() {
         let mut stats = CoverageStats::new();
-        stats.classify(30);   // critical
-        stats.classify(75);   // alert
-        stats.classify(400);  // acceptable
-        
+        stats.classify(30); // critical
+        stats.classify(75); // alert
+        stats.classify(400); // acceptable
+
         assert_eq!(stats.critical, 1);
         assert_eq!(stats.alert, 1);
         assert_eq!(stats.acceptable, 1);
         assert_eq!(stats.total(), 3);
     }
-    
+
     #[test]
     fn test_health_score() {
         let mut stats = CoverageStats::new();

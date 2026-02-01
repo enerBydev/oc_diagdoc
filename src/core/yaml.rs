@@ -5,10 +5,10 @@
 //! - Extraer el body del documento
 //! - Actualizar campos individuales preservando formato
 
-use std::path::Path;
-use serde::{Deserialize, Serialize};
 use crate::errors::{OcError, OcResult};
-use crate::types::{DocumentId, DocumentStatus, DocumentType, Breadcrumb, OcDate};
+use crate::types::{Breadcrumb, DocumentId, DocumentStatus, OcDate};
+use serde::{Deserialize, Serialize};
+use std::path::Path;
 
 /// Delimitador de frontmatter YAML.
 pub const FRONTMATTER_DELIMITER: &str = "---";
@@ -19,85 +19,82 @@ pub struct YamlFrontmatter {
     // ═══════════════════════════════════════════════════════════════
     // CAMPOS REQUERIDOS
     // ═══════════════════════════════════════════════════════════════
-    
     /// ID jerárquico del documento (ej: "3.1.2").
     pub id: String,
-    
+
     /// Título del documento.
     pub title: String,
-    
+
     /// ID del padre (vacío para master).
     #[serde(default)]
     pub parent: Option<String>,
-    
+
     /// Breadcrumb jerárquico.
     #[serde(default)]
     pub breadcrumb: String,
-    
+
     /// Estado del documento.
     #[serde(default)]
     pub status: String,
-    
+
     // ═══════════════════════════════════════════════════════════════
     // CAMPOS SEMI-REQUERIDOS
     // ═══════════════════════════════════════════════════════════════
-    
     /// Tipo de documento.
     #[serde(default, alias = "type")]
     pub doc_type: Option<String>,
-    
+
     /// Fecha de creación.
     #[serde(default)]
     pub created: Option<String>,
-    
+
     /// Fecha de última actualización.
     #[serde(default)]
     pub last_updated: Option<String>,
-    
+
     /// Autor.
     #[serde(default)]
     pub author: Option<String>,
-    
+
     // ═══════════════════════════════════════════════════════════════
     // CAMPOS OPCIONALES
     // ═══════════════════════════════════════════════════════════════
-    
     /// Dominio funcional.
     #[serde(default)]
     pub domain: Option<String>,
-    
+
     /// Actores involucrados.
     #[serde(default)]
     pub actors: Option<Vec<String>>,
-    
+
     /// Tags/etiquetas.
     #[serde(default)]
     pub tags: Option<Vec<String>>,
-    
+
     /// Prioridad.
     #[serde(default)]
     pub priority: Option<String>,
-    
+
     /// Descripción corta.
     #[serde(default)]
     pub description: Option<String>,
-    
+
     /// Número de hijos directos.
     #[serde(default)]
     pub children_count: Option<usize>,
-    
+
     /// Número total de descendientes.
     #[serde(default)]
     pub descendants_count: Option<usize>,
-    
+
     /// Hash de contenido.
     #[serde(default)]
     pub content_hash: Option<String>,
-    
+
     /// Referencias/enlaces internos.
     #[serde(default)]
     pub references: Option<Vec<String>>,
-    
+
     /// Versión del documento.
     #[serde(default)]
     pub version: Option<String>,
@@ -134,32 +131,32 @@ impl YamlFrontmatter {
     pub fn document_id(&self) -> OcResult<DocumentId> {
         self.id.parse()
     }
-    
+
     /// Parsea el status como DocumentStatus.
     pub fn document_status(&self) -> OcResult<DocumentStatus> {
         self.status.parse()
     }
-    
+
     /// Parsea el breadcrumb como Breadcrumb.
     pub fn parsed_breadcrumb(&self) -> Breadcrumb {
         Breadcrumb::parse(&self.breadcrumb)
     }
-    
+
     /// Parsea la fecha de creación.
     pub fn created_date(&self) -> Option<OcResult<OcDate>> {
         self.created.as_ref().map(|s| s.parse())
     }
-    
+
     /// Parsea la fecha de última actualización.
     pub fn last_updated_date(&self) -> Option<OcResult<OcDate>> {
         self.last_updated.as_ref().map(|s| s.parse())
     }
-    
+
     /// ¿Es el documento master (ID = "0")?
     pub fn is_master(&self) -> bool {
         self.id == "0"
     }
-    
+
     /// Valida campos requeridos.
     pub fn validate(&self) -> OcResult<()> {
         if self.id.is_empty() {
@@ -178,7 +175,7 @@ impl YamlFrontmatter {
         let _id: DocumentId = self.id.parse()?;
         Ok(())
     }
-    
+
     /// Crea un builder para construir YamlFrontmatter de forma fluida.
     pub fn builder() -> YamlFrontmatterBuilder {
         YamlFrontmatterBuilder::new()
@@ -211,72 +208,72 @@ impl YamlFrontmatterBuilder {
     pub fn new() -> Self {
         Self::default()
     }
-    
+
     pub fn id(mut self, id: impl Into<String>) -> Self {
         self.id = Some(id.into());
         self
     }
-    
+
     pub fn title(mut self, title: impl Into<String>) -> Self {
         self.title = Some(title.into());
         self
     }
-    
+
     pub fn parent(mut self, parent: impl Into<String>) -> Self {
         self.parent = Some(parent.into());
         self
     }
-    
+
     pub fn breadcrumb(mut self, bc: impl Into<String>) -> Self {
         self.breadcrumb = Some(bc.into());
         self
     }
-    
+
     pub fn status(mut self, status: impl Into<String>) -> Self {
         self.status = Some(status.into());
         self
     }
-    
+
     pub fn doc_type(mut self, t: impl Into<String>) -> Self {
         self.doc_type = Some(t.into());
         self
     }
-    
+
     pub fn created(mut self, date: impl Into<String>) -> Self {
         self.created = Some(date.into());
         self
     }
-    
+
     pub fn last_updated(mut self, date: impl Into<String>) -> Self {
         self.last_updated = Some(date.into());
         self
     }
-    
+
     pub fn author(mut self, author: impl Into<String>) -> Self {
         self.author = Some(author.into());
         self
     }
-    
+
     pub fn domain(mut self, domain: impl Into<String>) -> Self {
         self.domain = Some(domain.into());
         self
     }
-    
+
     pub fn tags(mut self, tags: Vec<String>) -> Self {
         self.tags = Some(tags);
         self
     }
-    
+
     pub fn priority(mut self, priority: impl Into<String>) -> Self {
         self.priority = Some(priority.into());
         self
     }
-    
+
     pub fn description(mut self, desc: impl Into<String>) -> Self {
         self.description = Some(desc.into());
         self
     }
-    
+
     /// Construye el YamlFrontmatter, validando campos requeridos.
     pub fn build(self) -> OcResult<YamlFrontmatter> {
         let fm = YamlFrontmatter {
@@ -306,11 +303,11 @@ impl YamlFrontmatterBuilder {
             references: None,
             version: None,
         };
-        
+
         fm.validate()?;
         Ok(fm)
     }
-    
+
     /// Construye sin validar (para casos especiales).
     pub fn build_unchecked(self) -> YamlFrontmatter {
         YamlFrontmatter {
@@ -351,17 +348,18 @@ pub struct ParsedDocument {
 /// Parsea el frontmatter YAML de un contenido markdown.
 pub fn parse_frontmatter(content: &str) -> OcResult<ParsedDocument> {
     let content = content.trim_start();
-    
+
     // Verificar que empiece con ---
     if !content.starts_with(FRONTMATTER_DELIMITER) {
         return Err(OcError::MissingFrontmatter(std::path::PathBuf::new()));
     }
-    
+
     // Buscar el segundo ---
     let after_first = &content[3..];
-    let end_pos = after_first.find(FRONTMATTER_DELIMITER)
+    let end_pos = after_first
+        .find(FRONTMATTER_DELIMITER)
         .ok_or_else(|| OcError::MissingFrontmatter(std::path::PathBuf::new()))?;
-    
+
     let yaml_content = &after_first[..end_pos].trim();
     let body_start = 3 + end_pos + 3; // Primer --- + yaml + segundo ---
     let body = if body_start < content.len() {
@@ -369,14 +367,14 @@ pub fn parse_frontmatter(content: &str) -> OcResult<ParsedDocument> {
     } else {
         String::new()
     };
-    
+
     // Parsear YAML
-    let frontmatter: YamlFrontmatter = serde_yaml::from_str(yaml_content)
-        .map_err(|e| OcError::YamlParse {
+    let frontmatter: YamlFrontmatter =
+        serde_yaml::from_str(yaml_content).map_err(|e| OcError::YamlParse {
             path: std::path::PathBuf::new(),
             message: e.to_string(),
         })?;
-    
+
     Ok(ParsedDocument {
         frontmatter,
         yaml_raw: yaml_content.to_string(),
@@ -387,14 +385,13 @@ pub fn parse_frontmatter(content: &str) -> OcResult<ParsedDocument> {
 /// Parsea frontmatter de un archivo.
 pub fn parse_frontmatter_from_file(path: impl AsRef<Path>) -> OcResult<ParsedDocument> {
     let path = path.as_ref();
-    let content = std::fs::read_to_string(path)
-        .map_err(|e| OcError::FileRead {
-            path: path.to_path_buf(),
-            source: e,
-        })?;
-    
-    let mut result = parse_frontmatter(&content)?;
-    
+    let content = std::fs::read_to_string(path).map_err(|e| OcError::FileRead {
+        path: path.to_path_buf(),
+        source: e,
+    })?;
+
+    let result = parse_frontmatter(&content)?;
+
     // Actualizar paths en errores de validación si los hay
     if let Err(e) = result.frontmatter.validate() {
         return Err(match e {
@@ -405,7 +402,7 @@ pub fn parse_frontmatter_from_file(path: impl AsRef<Path>) -> OcResult<ParsedDoc
             other => other,
         });
     }
-    
+
     Ok(result)
 }
 
@@ -418,27 +415,27 @@ pub fn extract_body(content: &str) -> OcResult<String> {
 /// Actualiza un campo específico en el frontmatter preservando formato.
 pub fn update_field(content: &str, field: &str, value: &str) -> OcResult<String> {
     let content = content.trim_start();
-    
+
     // Verificar frontmatter existe
     if !content.starts_with(FRONTMATTER_DELIMITER) {
         return Err(OcError::MissingFrontmatter(std::path::PathBuf::new()));
     }
-    
+
     // Buscar el campo en el YAML
     let pattern = format!("{}:", field);
-    
+
     if let Some(field_pos) = content.find(&pattern) {
         // Encontrar el final de la línea
         let after_field = &content[field_pos..];
         let line_end = after_field.find('\n').unwrap_or(after_field.len());
-        
+
         // Construir nueva línea
         let new_line = format!("{}: {}", field, value);
-        
+
         // Reconstruir contenido
         let before = &content[..field_pos];
         let after = &content[field_pos + line_end..];
-        
+
         Ok(format!("{}{}{}", before, new_line, after))
     } else {
         // Campo no existe, agregarlo antes del segundo ---
@@ -449,21 +446,21 @@ pub fn update_field(content: &str, field: &str, value: &str) -> OcResult<String>
 /// Agrega un nuevo campo al frontmatter.
 pub fn add_field(content: &str, field: &str, value: &str) -> OcResult<String> {
     let content = content.trim_start();
-    
+
     // Verificar frontmatter existe
     if !content.starts_with(FRONTMATTER_DELIMITER) {
         return Err(OcError::MissingFrontmatter(std::path::PathBuf::new()));
     }
-    
+
     // Buscar el segundo ---
     let after_first = &content[3..];
     if let Some(end_pos) = after_first.find(FRONTMATTER_DELIMITER) {
         let before_end = &content[..3 + end_pos];
         let after_end = &content[3 + end_pos..];
-        
+
         // Agregar campo antes del segundo ---
         let new_line = format!("{}: {}\n", field, value);
-        
+
         Ok(format!("{}{}{}", before_end, new_line, after_end))
     } else {
         Err(OcError::MissingFrontmatter(std::path::PathBuf::new()))
@@ -474,29 +471,28 @@ pub fn add_field(content: &str, field: &str, value: &str) -> OcResult<String> {
 pub fn count_words(body: &str) -> usize {
     let mut in_code_block = false;
     let mut word_count = 0;
-    
+
     for line in body.lines() {
         let trimmed = line.trim();
-        
+
         // Toggle code block
         if trimmed.starts_with("```") {
             in_code_block = !in_code_block;
             continue;
         }
-        
+
         // Skip code blocks
         if in_code_block {
             continue;
         }
-        
+
         // Skip headings for word count? (optional, keeping them)
         // Skip images and links (contar solo texto)
-        let text = trimmed
-            .replace(|c: char| c == '#' || c == '*' || c == '_' || c == '`', " ");
-        
+        let text = trimmed.replace(|c: char| c == '#' || c == '*' || c == '_' || c == '`', " ");
+
         word_count += text.split_whitespace().count();
     }
-    
+
     word_count
 }
 

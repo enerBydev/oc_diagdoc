@@ -2,10 +2,10 @@
 //!
 //! Crea y gestiona snapshots del estado del proyecto.
 
-use std::path::PathBuf;
+use crate::errors::OcResult;
 use clap::Parser;
 use serde::Serialize;
-use crate::errors::OcResult;
+use std::path::PathBuf;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SNAPSHOT TYPES
@@ -49,7 +49,7 @@ impl SnapshotResult {
             snapshots: Vec::new(),
         }
     }
-    
+
     pub fn list(snapshots: Vec<SnapshotInfo>) -> Self {
         Self {
             action: "list".to_string(),
@@ -69,11 +69,11 @@ impl SnapshotResult {
 pub struct SnapshotCommand {
     /// Nombre del snapshot.
     pub name: Option<String>,
-    
+
     /// Listar snapshots.
     #[arg(short, long)]
     pub list: bool,
-    
+
     /// Ruta del proyecto.
     #[arg(short, long)]
     pub path: Option<PathBuf>,
@@ -131,7 +131,7 @@ mod tests {
 #[cfg(feature = "cli")]
 pub fn run(cmd: SnapshotCommand, _cli: &crate::commands::CliConfig) -> anyhow::Result<()> {
     let result = cmd.run()?;
-    
+
     if result.action == "list" {
         println!("📷 Snapshots disponibles:");
         for s in &result.snapshots {
@@ -140,6 +140,6 @@ pub fn run(cmd: SnapshotCommand, _cli: &crate::commands::CliConfig) -> anyhow::R
     } else if let Some(s) = &result.snapshot {
         println!("📷 Snapshot creado: {} ({})", s.name, s.id);
     }
-    
+
     Ok(())
 }

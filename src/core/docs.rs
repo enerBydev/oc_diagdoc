@@ -2,8 +2,6 @@
 //!
 //! Genera documentación del proyecto y API.
 
-use std::path::PathBuf;
-
 // ═══════════════════════════════════════════════════════════════════════════
 // DOCS TYPES
 // ═══════════════════════════════════════════════════════════════════════════
@@ -24,7 +22,7 @@ impl DocSection {
             level,
         }
     }
-    
+
     pub fn to_markdown(&self) -> String {
         let prefix = "#".repeat(self.level as usize);
         format!("{} {}\n\n{}", prefix, self.title, self.content)
@@ -45,13 +43,14 @@ impl GeneratedDoc {
             sections: Vec::new(),
         }
     }
-    
+
     pub fn add_section(&mut self, section: DocSection) {
         self.sections.push(section);
     }
-    
+
     pub fn to_markdown(&self) -> String {
-        self.sections.iter()
+        self.sections
+            .iter()
             .map(|s| s.to_markdown())
             .collect::<Vec<_>>()
             .join("\n\n")
@@ -71,28 +70,28 @@ impl ReadmeGenerator {
             version: version.to_string(),
         }
     }
-    
+
     pub fn generate(&self) -> GeneratedDoc {
         let mut doc = GeneratedDoc::new("README.md");
-        
+
         doc.add_section(DocSection::new(
             &format!("{} v{}", self.project_name, self.version),
             "Sistema de diagnóstico de documentación técnica.",
             1,
         ));
-        
+
         doc.add_section(DocSection::new(
             "Instalación",
             "```bash\ncargo install oc_diagdoc\n```",
             2,
         ));
-        
+
         doc.add_section(DocSection::new(
             "Uso",
             "```bash\noc_diagdoc verify\noc_diagdoc stats\noc_diagdoc health\n```",
             2,
         ));
-        
+
         doc
     }
 }
@@ -111,20 +110,24 @@ pub struct ChangelogEntry {
 
 impl ChangelogGenerator {
     pub fn new() -> Self {
-        Self { entries: Vec::new() }
+        Self {
+            entries: Vec::new(),
+        }
     }
-    
+
     pub fn add_entry(&mut self, entry: ChangelogEntry) {
         self.entries.push(entry);
     }
-    
+
     pub fn generate(&self) -> GeneratedDoc {
         let mut doc = GeneratedDoc::new("CHANGELOG.md");
-        
+
         doc.add_section(DocSection::new("Changelog", "Historial de cambios.", 1));
-        
+
         for entry in &self.entries {
-            let content = entry.changes.iter()
+            let content = entry
+                .changes
+                .iter()
                 .map(|c| format!("- {}", c))
                 .collect::<Vec<_>>()
                 .join("\n");
@@ -134,7 +137,7 @@ impl ChangelogGenerator {
                 2,
             ));
         }
-        
+
         doc
     }
 }

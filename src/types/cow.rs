@@ -17,47 +17,48 @@ pub struct SmartString<'a> {
 
 impl<'a> SmartString<'a> {
     pub fn borrowed(s: &'a str) -> Self {
-        Self { inner: Cow::Borrowed(s) }
+        Self {
+            inner: Cow::Borrowed(s),
+        }
     }
-    
+
     pub fn owned(s: String) -> Self {
-        Self { inner: Cow::Owned(s) }
+        Self {
+            inner: Cow::Owned(s),
+        }
     }
-    
+
     pub fn is_borrowed(&self) -> bool {
         matches!(self.inner, Cow::Borrowed(_))
     }
-    
+
     pub fn len(&self) -> usize {
         self.inner.len()
     }
-    
+
     pub fn is_empty(&self) -> bool {
         self.inner.is_empty()
     }
-    
+
     /// Normaliza espacios solo si es necesario.
     pub fn normalize_whitespace(&mut self) {
         if self.inner.contains("  ") || self.inner.contains('\t') {
-            let normalized: String = self.inner
-                .split_whitespace()
-                .collect::<Vec<_>>()
-                .join(" ");
+            let normalized: String = self.inner.split_whitespace().collect::<Vec<_>>().join(" ");
             self.inner = Cow::Owned(normalized);
         }
     }
-    
+
     /// Convierte a minúsculas solo si es necesario.
     pub fn to_lowercase(&mut self) {
         if self.inner.chars().any(|c| c.is_uppercase()) {
             self.inner = Cow::Owned(self.inner.to_lowercase());
         }
     }
-    
+
     pub fn as_str(&self) -> &str {
         &self.inner
     }
-    
+
     pub fn into_owned(self) -> String {
         self.inner.into_owned()
     }
@@ -76,7 +77,7 @@ impl From<String> for SmartString<'static> {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// R44: COW PATH UTILITIES  
+// R44: COW PATH UTILITIES
 // ═══════════════════════════════════════════════════════════════════════════
 
 /// Path inteligente con semántica Cow.
@@ -87,36 +88,38 @@ pub struct SmartPath<'a> {
 
 impl<'a> SmartPath<'a> {
     pub fn borrowed(path: &'a Path) -> Self {
-        Self { inner: Cow::Borrowed(path) }
+        Self {
+            inner: Cow::Borrowed(path),
+        }
     }
-    
+
     pub fn owned(path: PathBuf) -> Self {
-        Self { inner: Cow::Owned(path) }
+        Self {
+            inner: Cow::Owned(path),
+        }
     }
-    
+
     pub fn is_borrowed(&self) -> bool {
         matches!(self.inner, Cow::Borrowed(_))
     }
-    
+
     /// Une un componente, clonando solo si es necesario.
     pub fn join(&self, component: &str) -> SmartPath<'static> {
         SmartPath::owned(self.inner.join(component))
     }
-    
+
     /// Normaliza el path solo si es necesario.
     pub fn normalize(&mut self) {
-        let normalized: PathBuf = self.inner
-            .components()
-            .collect();
+        let normalized: PathBuf = self.inner.components().collect();
         if normalized != self.inner.as_ref() {
             self.inner = Cow::Owned(normalized);
         }
     }
-    
+
     pub fn as_path(&self) -> &Path {
         &self.inner
     }
-    
+
     pub fn exists(&self) -> bool {
         self.inner.exists()
     }
@@ -146,34 +149,38 @@ pub struct SmartVec<'a, T: Clone> {
 
 impl<'a, T: Clone> SmartVec<'a, T> {
     pub fn borrowed(slice: &'a [T]) -> Self {
-        Self { inner: Cow::Borrowed(slice) }
+        Self {
+            inner: Cow::Borrowed(slice),
+        }
     }
-    
+
     pub fn owned(vec: Vec<T>) -> Self {
-        Self { inner: Cow::Owned(vec) }
+        Self {
+            inner: Cow::Owned(vec),
+        }
     }
-    
+
     pub fn is_borrowed(&self) -> bool {
         matches!(self.inner, Cow::Borrowed(_))
     }
-    
+
     pub fn len(&self) -> usize {
         self.inner.len()
     }
-    
+
     pub fn is_empty(&self) -> bool {
         self.inner.is_empty()
     }
-    
+
     /// Push que clona solo si es necesario.
     pub fn push(&mut self, value: T) {
         self.inner.to_mut().push(value);
     }
-    
+
     pub fn as_slice(&self) -> &[T] {
         &self.inner
     }
-    
+
     pub fn into_owned(self) -> Vec<T> {
         self.inner.into_owned()
     }
@@ -200,7 +207,13 @@ where
     if items.iter().all(|item| predicate(item)) {
         Cow::Borrowed(items)
     } else {
-        Cow::Owned(items.iter().filter(|item| predicate(item)).cloned().collect())
+        Cow::Owned(
+            items
+                .iter()
+                .filter(|item| predicate(item))
+                .cloned()
+                .collect(),
+        )
     }
 }
 

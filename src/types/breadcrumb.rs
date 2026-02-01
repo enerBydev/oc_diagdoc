@@ -17,7 +17,7 @@ impl Breadcrumb {
             .map(|seg| seg.trim().to_string())
             .filter(|seg| !seg.is_empty())
             .collect();
-        
+
         Self {
             raw: s.to_string(),
             segments,
@@ -43,7 +43,7 @@ impl Breadcrumb {
     pub fn is_empty(&self) -> bool {
         self.segments.is_empty()
     }
-    
+
     /// Primer segmento (raíz).
     pub fn root(&self) -> Option<&str> {
         self.segments.first().map(|s| s.as_str())
@@ -71,7 +71,7 @@ impl From<String> for Breadcrumb {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_breadcrumb_parse() {
         let bc = Breadcrumb::parse("OnlyCar > Módulo 3 > Subpágina");

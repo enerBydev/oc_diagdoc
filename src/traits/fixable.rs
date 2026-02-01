@@ -1,7 +1,7 @@
 //! Trait para reparación automática.
 
-use std::path::PathBuf;
 use crate::errors::OcResult;
+use std::path::PathBuf;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // FIX RESULT
@@ -24,7 +24,7 @@ impl FixResult {
     pub fn is_success(&self) -> bool {
         matches!(self, Self::Applied { .. } | Self::NotNeeded)
     }
-    
+
     pub fn is_failure(&self) -> bool {
         matches!(self, Self::Failed { .. })
     }
@@ -62,17 +62,17 @@ impl Fix {
             after: None,
         }
     }
-    
+
     pub fn with_file(mut self, file: impl Into<PathBuf>) -> Self {
         self.file = Some(file.into());
         self
     }
-    
+
     pub fn manual(mut self) -> Self {
         self.auto_apply = false;
         self
     }
-    
+
     pub fn with_preview(mut self, before: impl Into<String>, after: impl Into<String>) -> Self {
         self.before = Some(before.into());
         self.after = Some(after.into());
@@ -88,29 +88,33 @@ impl Fix {
 pub trait Fixable {
     /// Sugiere fixes disponibles.
     fn suggest_fixes(&self) -> Vec<Fix>;
-    
+
     /// Aplica un fix específico.
     fn apply_fix(&mut self, fix: &Fix) -> OcResult<FixResult>;
-    
+
     /// Aplica todos los fixes automáticos.
     fn apply_all_auto_fixes(&mut self) -> Vec<FixResult> {
-        let fixes: Vec<Fix> = self.suggest_fixes()
+        let fixes: Vec<Fix> = self
+            .suggest_fixes()
             .into_iter()
             .filter(|f| f.auto_apply)
             .collect();
-        
-        fixes.iter()
-            .map(|fix| self.apply_fix(fix).unwrap_or(FixResult::Failed {
-                reason: "Failed to apply".to_string(),
-            }))
+
+        fixes
+            .iter()
+            .map(|fix| {
+                self.apply_fix(fix).unwrap_or(FixResult::Failed {
+                    reason: "Failed to apply".to_string(),
+                })
+            })
             .collect()
     }
-    
+
     /// ¿Tiene fixes disponibles?
     fn has_fixes(&self) -> bool {
         !self.suggest_fixes().is_empty()
     }
-    
+
     /// Cuenta fixes automáticos disponibles.
     fn auto_fix_count(&self) -> usize {
         self.suggest_fixes().iter().filter(|f| f.auto_apply).count()
@@ -123,9 +127,8 @@ mod tests {
 
     #[test]
     fn test_fix_new() {
-        let fix = Fix::new("F001", "Fix description")
-            .with_file("test.md");
-        
+        let fix = Fix::new("F001", "Fix description").with_file("test.md");
+
         assert_eq!(fix.code, "F001");
         assert!(fix.auto_apply);
     }
@@ -138,9 +141,13 @@ mod tests {
 
     #[test]
     fn test_fix_result() {
-        let success = FixResult::Applied { description: "Done".to_string() };
-        let failure = FixResult::Failed { reason: "Error".to_string() };
-        
+        let success = FixResult::Applied {
+            description: "Done".to_string(),
+        };
+        let failure = FixResult::Failed {
+            reason: "Error".to_string(),
+        };
+
         assert!(success.is_success());
         assert!(failure.is_failure());
     }

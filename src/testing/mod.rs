@@ -5,6 +5,6 @@
 pub mod fixtures;
 pub mod mocks;
 
-pub use fixtures::{TestProject, sample_frontmatter, minimal_document, generate_module_docs};
-pub use fixtures::{assert_file_exists, assert_file_contains};
-pub use mocks::{MockFileSystem, MockConfig, MockLogger, MockCache};
+pub use fixtures::{assert_file_contains, assert_file_exists};
+pub use fixtures::{generate_module_docs, minimal_document, sample_frontmatter, TestProject};
+pub use mocks::{MockCache, MockConfig, MockFileSystem, MockLogger};

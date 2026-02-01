@@ -2,13 +2,13 @@
 //!
 //! Contiene toda la información sobre el proyecto de documentación.
 
-use std::path::PathBuf;
-use std::collections::HashMap;
-use crate::types::DocumentId;
+use crate::core::config::OcConfig;
 use crate::data::document::{Document, DocumentCollection};
 use crate::data::hierarchy::HierarchyTree;
 use crate::data::module::ModuleRegistry;
-use crate::core::config::OcConfig;
+use crate::types::DocumentId;
+use std::collections::HashMap;
+use std::path::PathBuf;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // PROJECT STATS
@@ -74,7 +74,7 @@ impl ProjectState {
             doc_index: HashMap::new(),
         }
     }
-    
+
     /// Carga documentos desde el directorio de datos.
     pub fn load_documents(&mut self, docs: Vec<Document>) {
         // Indexar
@@ -83,19 +83,19 @@ impl ProjectState {
                 self.doc_index.insert(id, i);
             }
         }
-        
+
         // Construir estructuras
         self.hierarchy = HierarchyTree::from_documents(docs.clone());
         self.modules = ModuleRegistry::from_documents(&docs);
         self.documents = DocumentCollection::from(docs);
-        
+
         // Calcular estadísticas
         self.compute_stats();
     }
-    
+
     fn compute_stats(&mut self) {
         let docs: Vec<_> = self.documents.iter().collect();
-        
+
         self.stats.total_docs = docs.len();
         self.stats.total_words = docs.iter().map(|d| d.word_count).sum();
         self.stats.healthy_docs = docs.iter().filter(|d| d.is_healthy()).count();
@@ -110,18 +110,19 @@ impl ProjectState {
         self.stats.total_links = docs.iter().map(|d| d.links.len()).sum();
         self.stats.broken_links = docs.iter().map(|d| d.broken_link_count()).sum();
     }
-    
+
     /// Busca documento por ID.
     pub fn get_document(&self, id: &DocumentId) -> Option<&Document> {
-        self.doc_index.get(id)
+        self.doc_index
+            .get(id)
             .and_then(|&i| self.documents.iter().nth(i))
     }
-    
+
     /// Número de documentos.
     pub fn doc_count(&self) -> usize {
         self.stats.total_docs
     }
-    
+
     /// ¿Está el proyecto vacío?
     pub fn is_empty(&self) -> bool {
         self.documents.is_empty()
@@ -136,7 +137,7 @@ mod tests {
     fn test_project_state_new() {
         let config = OcConfig::default();
         let state = ProjectState::new(config);
-        
+
         assert!(state.is_empty());
         assert_eq!(state.doc_count(), 0);
     }

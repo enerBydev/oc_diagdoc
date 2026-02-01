@@ -25,7 +25,12 @@ pub struct ExecutionRecord {
 }
 
 impl ExecutionRecord {
-    pub fn new(command: impl Into<String>, duration: Duration, docs_processed: usize, success: bool) -> Self {
+    pub fn new(
+        command: impl Into<String>,
+        duration: Duration,
+        docs_processed: usize,
+        success: bool,
+    ) -> Self {
         Self {
             command: command.into(),
             timestamp: Instant::now(),
@@ -61,7 +66,7 @@ impl ExecutionStats {
             self.successful_runs as f64 / self.total_runs as f64 * 100.0
         }
     }
-    
+
     pub fn avg_duration(&self) -> Duration {
         if self.total_runs == 0 {
             Duration::ZERO
@@ -69,7 +74,7 @@ impl ExecutionStats {
             self.total_time / self.total_runs as u32
         }
     }
-    
+
     pub fn docs_per_second(&self) -> f64 {
         let secs = self.total_time.as_secs_f64();
         if secs == 0.0 {
@@ -103,12 +108,12 @@ impl ExecutionMemory {
             stats: ExecutionStats::default(),
         }
     }
-    
+
     pub fn with_max_history(mut self, max: usize) -> Self {
         self.max_history = max;
         self
     }
-    
+
     /// Registra una ejecución.
     pub fn record(&mut self, record: ExecutionRecord) {
         // Actualizar stats
@@ -118,59 +123,63 @@ impl ExecutionMemory {
         }
         self.stats.total_time += record.duration;
         self.stats.total_docs += record.docs_processed;
-        
+
         // Agregar al historial
         self.history.push_back(record);
-        
+
         // Truncar si excede
         while self.history.len() > self.max_history {
             self.history.pop_front();
         }
     }
-    
+
     /// Estadísticas actuales.
     pub fn stats(&self) -> &ExecutionStats {
         &self.stats
     }
-    
+
     /// Historial reciente.
     pub fn recent(&self, n: usize) -> Vec<&ExecutionRecord> {
         self.history.iter().rev().take(n).collect()
     }
-    
+
     /// Tendencia de duración (últimas N vs promedio).
     pub fn duration_trend(&self, last_n: usize) -> f64 {
         if self.history.len() < last_n {
             return 0.0;
         }
-        
-        let recent_avg: Duration = self.history.iter()
+
+        let recent_avg: Duration = self
+            .history
+            .iter()
             .rev()
             .take(last_n)
             .map(|r| r.duration)
-            .sum::<Duration>() / last_n as u32;
-        
+            .sum::<Duration>()
+            / last_n as u32;
+
         let overall_avg = self.stats.avg_duration();
-        
+
         if overall_avg.as_secs_f64() == 0.0 {
             0.0
         } else {
-            (recent_avg.as_secs_f64() - overall_avg.as_secs_f64()) / overall_avg.as_secs_f64() * 100.0
+            (recent_avg.as_secs_f64() - overall_avg.as_secs_f64()) / overall_avg.as_secs_f64()
+                * 100.0
         }
     }
-    
+
     /// Sugiere optimizaciones basadas en historial.
     pub fn suggest_optimizations(&self) -> Vec<String> {
         let mut suggestions = Vec::new();
-        
+
         if self.stats.success_rate() < 90.0 {
             suggestions.push("Consider running validation before commands".to_string());
         }
-        
+
         if self.stats.docs_per_second() < 10.0 && self.stats.total_runs > 5 {
             suggestions.push("Enable caching for better performance".to_string());
         }
-        
+
         suggestions
     }
 }
@@ -188,8 +197,13 @@ mod tests {
     #[test]
     fn test_execution_memory_record() {
         let mut memory = ExecutionMemory::new();
-        memory.record(ExecutionRecord::new("test", Duration::from_secs(1), 10, true));
-        
+        memory.record(ExecutionRecord::new(
+            "test",
+            Duration::from_secs(1),
+            10,
+            true,
+        ));
+
         assert_eq!(memory.stats().total_runs, 1);
         assert_eq!(memory.stats().successful_runs, 1);
     }
@@ -197,9 +211,19 @@ mod tests {
     #[test]
     fn test_execution_stats() {
         let mut memory = ExecutionMemory::new();
-        memory.record(ExecutionRecord::new("cmd1", Duration::from_secs(1), 10, true));
-        memory.record(ExecutionRecord::new("cmd2", Duration::from_secs(1), 10, false));
-        
+        memory.record(ExecutionRecord::new(
+            "cmd1",
+            Duration::from_secs(1),
+            10,
+            true,
+        ));
+        memory.record(ExecutionRecord::new(
+            "cmd2",
+            Duration::from_secs(1),
+            10,
+            false,
+        ));
+
         assert_eq!(memory.stats().success_rate(), 50.0);
     }
 
@@ -207,9 +231,14 @@ mod tests {
     fn test_recent() {
         let mut memory = ExecutionMemory::new();
         for i in 0..5 {
-            memory.record(ExecutionRecord::new(format!("cmd{}", i), Duration::from_secs(1), 1, true));
+            memory.record(ExecutionRecord::new(
+                format!("cmd{}", i),
+                Duration::from_secs(1),
+                1,
+                true,
+            ));
         }
-        
+
         let recent = memory.recent(3);
         assert_eq!(recent.len(), 3);
     }
@@ -218,9 +247,14 @@ mod tests {
     fn test_max_history() {
         let mut memory = ExecutionMemory::new().with_max_history(5);
         for i in 0..10 {
-            memory.record(ExecutionRecord::new(format!("cmd{}", i), Duration::from_secs(1), 1, true));
+            memory.record(ExecutionRecord::new(
+                format!("cmd{}", i),
+                Duration::from_secs(1),
+                1,
+                true,
+            ));
         }
-        
+
         assert_eq!(memory.history.len(), 5);
     }
 }

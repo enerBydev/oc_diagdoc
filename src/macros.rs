@@ -58,7 +58,7 @@ macro_rules! impl_from_str {
     ($type:ty, $($str:expr => $variant:expr),* $(,)?) => {
         impl std::str::FromStr for $type {
             type Err = String;
-            
+
             fn from_str(s: &str) -> Result<Self, Self::Err> {
                 match s.to_lowercase().as_str() {
                     $($str => Ok($variant),)*

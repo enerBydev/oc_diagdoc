@@ -28,7 +28,7 @@ impl DiagnosticSeverity {
             Self::Critical => "🚨",
         }
     }
-    
+
     pub fn label(&self) -> &'static str {
         match self {
             Self::Info => "INFO",
@@ -61,7 +61,11 @@ pub struct Diagnostic {
 }
 
 impl Diagnostic {
-    pub fn new(code: impl Into<String>, severity: DiagnosticSeverity, message: impl Into<String>) -> Self {
+    pub fn new(
+        code: impl Into<String>,
+        severity: DiagnosticSeverity,
+        message: impl Into<String>,
+    ) -> Self {
         Self {
             code: code.into(),
             severity,
@@ -71,33 +75,33 @@ impl Diagnostic {
             suggestion: None,
         }
     }
-    
+
     pub fn info(code: impl Into<String>, message: impl Into<String>) -> Self {
         Self::new(code, DiagnosticSeverity::Info, message)
     }
-    
+
     pub fn warning(code: impl Into<String>, message: impl Into<String>) -> Self {
         Self::new(code, DiagnosticSeverity::Warning, message)
     }
-    
+
     pub fn error(code: impl Into<String>, message: impl Into<String>) -> Self {
         Self::new(code, DiagnosticSeverity::Error, message)
     }
-    
+
     pub fn critical(code: impl Into<String>, message: impl Into<String>) -> Self {
         Self::new(code, DiagnosticSeverity::Critical, message)
     }
-    
+
     pub fn with_file(mut self, file: impl Into<PathBuf>) -> Self {
         self.file = Some(file.into());
         self
     }
-    
+
     pub fn with_line(mut self, line: usize) -> Self {
         self.line = Some(line);
         self
     }
-    
+
     pub fn with_suggestion(mut self, suggestion: impl Into<String>) -> Self {
         self.suggestion = Some(suggestion.into());
         self
@@ -112,17 +116,21 @@ impl Diagnostic {
 pub trait Diagnosable {
     /// Ejecuta diagnóstico y retorna lista de problemas.
     fn diagnose(&self) -> Vec<Diagnostic>;
-    
+
     /// ¿Tiene errores?
     fn has_errors(&self) -> bool {
-        self.diagnose().iter().any(|d| d.severity >= DiagnosticSeverity::Error)
+        self.diagnose()
+            .iter()
+            .any(|d| d.severity >= DiagnosticSeverity::Error)
     }
-    
+
     /// ¿Tiene warnings o peor?
     fn has_warnings(&self) -> bool {
-        self.diagnose().iter().any(|d| d.severity >= DiagnosticSeverity::Warning)
+        self.diagnose()
+            .iter()
+            .any(|d| d.severity >= DiagnosticSeverity::Warning)
     }
-    
+
     /// Cuenta diagnósticos por severidad.
     fn count_by_severity(&self) -> std::collections::HashMap<DiagnosticSeverity, usize> {
         let mut counts = std::collections::HashMap::new();
@@ -131,10 +139,11 @@ pub trait Diagnosable {
         }
         counts
     }
-    
+
     /// Solo errores y críticos.
     fn errors(&self) -> Vec<Diagnostic> {
-        self.diagnose().into_iter()
+        self.diagnose()
+            .into_iter()
             .filter(|d| d.severity >= DiagnosticSeverity::Error)
             .collect()
     }
@@ -149,7 +158,7 @@ mod tests {
         let diag = Diagnostic::error("E001", "Test error")
             .with_file("test.md")
             .with_suggestion("Fix it");
-        
+
         assert_eq!(diag.code, "E001");
         assert_eq!(diag.severity, DiagnosticSeverity::Error);
         assert!(diag.suggestion.is_some());

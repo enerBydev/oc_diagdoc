@@ -1,8 +1,8 @@
 //! Tipos de documentos en la jerarquía.
 
+use crate::errors::OcError;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
-use crate::errors::OcError;
 
 /// Tipo de documento según su posición jerárquica.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]

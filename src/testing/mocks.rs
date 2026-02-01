@@ -18,19 +18,19 @@ impl MockFileSystem {
     pub fn new() -> Self {
         Self::default()
     }
-    
+
     pub fn add_file(&mut self, path: &str, content: &str) {
         self.files.insert(path.to_string(), content.to_string());
     }
-    
+
     pub fn read(&self, path: &str) -> Option<&String> {
         self.files.get(path)
     }
-    
+
     pub fn exists(&self, path: &str) -> bool {
         self.files.contains_key(path)
     }
-    
+
     pub fn file_count(&self) -> usize {
         self.files.len()
     }
@@ -44,13 +44,15 @@ pub struct MockConfig {
 
 impl MockConfig {
     pub fn new() -> Self {
-        Self { values: HashMap::new() }
+        Self {
+            values: HashMap::new(),
+        }
     }
-    
+
     pub fn set(&mut self, key: &str, value: &str) {
         self.values.insert(key.to_string(), value.to_string());
     }
-    
+
     pub fn get(&self, key: &str) -> Option<&String> {
         self.values.get(key)
     }
@@ -72,23 +74,23 @@ impl MockLogger {
     pub fn new() -> Self {
         Self::default()
     }
-    
+
     pub fn log(&mut self, level: &str, msg: &str) {
         self.messages.push((level.to_string(), msg.to_string()));
     }
-    
+
     pub fn info(&mut self, msg: &str) {
         self.log("INFO", msg);
     }
-    
+
     pub fn error(&mut self, msg: &str) {
         self.log("ERROR", msg);
     }
-    
+
     pub fn has_errors(&self) -> bool {
         self.messages.iter().any(|(l, _)| l == "ERROR")
     }
-    
+
     pub fn message_count(&self) -> usize {
         self.messages.len()
     }
@@ -110,7 +112,7 @@ impl<V: Clone> MockCache<V> {
             misses: 0,
         }
     }
-    
+
     pub fn get(&mut self, key: &str) -> Option<V> {
         match self.data.get(key) {
             Some(v) => {
@@ -123,14 +125,18 @@ impl<V: Clone> MockCache<V> {
             }
         }
     }
-    
+
     pub fn set(&mut self, key: &str, value: V) {
         self.data.insert(key.to_string(), value);
     }
-    
+
     pub fn hit_rate(&self) -> f64 {
         let total = self.hits + self.misses;
-        if total == 0 { 0.0 } else { self.hits as f64 / total as f64 }
+        if total == 0 {
+            0.0
+        } else {
+            self.hits as f64 / total as f64
+        }
     }
 }
 

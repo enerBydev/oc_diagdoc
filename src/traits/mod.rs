@@ -13,26 +13,28 @@
 //! - Iteradores (PreOrderIter, PostOrderIter, LevelOrderIter)
 //! - Conversiones (AsRef, Deref, From/Into)
 
-pub mod validatable;
-pub mod renderable;
 pub mod cacheable;
+pub mod comparable;
+pub mod conversions;
 pub mod diagnosable;
 pub mod fixable;
 pub mod hashable;
-pub mod comparable;
+pub mod iterators;
+pub mod renderable;
 pub mod searchable;
 pub mod serializable;
-pub mod iterators;
-pub mod conversions;
+pub mod validatable;
 
-pub use validatable::{Validatable, ValidatableCollection};
-pub use renderable::{Renderable, OutputFormat};
 pub use cacheable::Cacheable;
-pub use diagnosable::{Diagnosable, Diagnostic, DiagnosticSeverity};
-pub use fixable::{Fixable, Fix, FixResult};
-pub use hashable::Hashable;
 pub use comparable::{Comparable, SimilarityScore};
-pub use searchable::{Searchable, SearchResult};
-pub use serializable::{Serializable, Deserializable, SerializationFormat};
-pub use iterators::{PreOrderIter, PostOrderIter, LevelOrderIter, FilteredIter, IteratorExt};
-pub use conversions::{DataPath, HashString, DocId, HasChildren, HasModule, LeavesIter, ModuleIter};
+pub use conversions::{
+    DataPath, DocId, HasChildren, HasModule, HashString, LeavesIter, ModuleIter,
+};
+pub use diagnosable::{Diagnosable, Diagnostic, DiagnosticSeverity};
+pub use fixable::{Fix, FixResult, Fixable};
+pub use hashable::Hashable;
+pub use iterators::{FilteredIter, IteratorExt, LevelOrderIter, PostOrderIter, PreOrderIter};
+pub use renderable::{OutputFormat, Renderable};
+pub use searchable::{SearchResult, Searchable};
+pub use serializable::{Deserializable, Serializable, SerializationFormat};
+pub use validatable::{Validatable, ValidatableCollection};

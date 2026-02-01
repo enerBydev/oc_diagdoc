@@ -30,14 +30,18 @@ pub const LOGO_COMPACT: &str = "🦀⚛️☢️ oc_diagdoc";
 /// Imprime el banner con versión.
 pub fn print_banner(version: &str) {
     println!("{}", LOGO.cyan());
-    println!("{}", format!("    v{} - Nuclear Documentation Diagnostics", version).bright_black());
+    println!(
+        "{}",
+        format!("    v{} - Nuclear Documentation Diagnostics", version).bright_black()
+    );
     println!();
 }
 
 /// Imprime banner compacto.
 pub fn print_compact_banner(version: &str) {
-    println!("{} {} {}", 
-        LOGO_COMPACT, 
+    println!(
+        "{} {} {}",
+        LOGO_COMPACT,
         format!("v{}", version).cyan(),
         "Nuclear Documentation Diagnostics".bright_black()
     );
@@ -63,11 +67,11 @@ pub fn titled_separator(title: &str, width: usize) -> String {
     if title_len + 4 >= width {
         return format!("─ {} ─", title);
     }
-    
+
     let remaining = width - title_len - 4;
     let left = remaining / 2;
     let right = remaining - left;
-    
+
     format!("{}─ {} ─{}", "─".repeat(left), title, "─".repeat(right))
 }
 
@@ -98,7 +102,7 @@ pub mod box_chars {
     pub const T_LEFT: char = '┤';
     pub const T_RIGHT: char = '├';
     pub const CROSS: char = '┼';
-    
+
     // Doble línea
     pub const D_TOP_LEFT: char = '╔';
     pub const D_TOP_RIGHT: char = '╗';
@@ -111,41 +115,57 @@ pub mod box_chars {
 /// Crea una caja de texto simple.
 pub fn text_box(text: &str, width: usize) -> String {
     use box_chars::*;
-    
+
     let inner_width = width.saturating_sub(2);
     let padded = format!("{:<width$}", text, width = inner_width);
-    
-    let top = format!("{}{}{}", TOP_LEFT, HORIZONTAL.to_string().repeat(inner_width), TOP_RIGHT);
+
+    let top = format!(
+        "{}{}{}",
+        TOP_LEFT,
+        HORIZONTAL.to_string().repeat(inner_width),
+        TOP_RIGHT
+    );
     let middle = format!("{}{}{}", VERTICAL, padded, VERTICAL);
-    let bottom = format!("{}{}{}", BOTTOM_LEFT, HORIZONTAL.to_string().repeat(inner_width), BOTTOM_RIGHT);
-    
+    let bottom = format!(
+        "{}{}{}",
+        BOTTOM_LEFT,
+        HORIZONTAL.to_string().repeat(inner_width),
+        BOTTOM_RIGHT
+    );
+
     format!("{}\n{}\n{}", top, middle, bottom)
 }
 
 /// Crea una caja con título.
 pub fn titled_box(title: &str, content: &str, width: usize) -> String {
     use box_chars::*;
-    
+
     let inner_width = width.saturating_sub(2);
     let title_line = format!(" {} ", title);
     let title_padding = inner_width.saturating_sub(title_line.len());
-    
-    let top = format!("{}{}{}{}", 
-        TOP_LEFT, 
-        title_line, 
+
+    let top = format!(
+        "{}{}{}{}",
+        TOP_LEFT,
+        title_line,
         HORIZONTAL.to_string().repeat(title_padding),
         TOP_RIGHT
     );
-    
+
     let mut lines = vec![top];
-    
+
     for line in content.lines() {
         let padded = format!("{:<width$}", line, width = inner_width);
         lines.push(format!("{}{}{}", VERTICAL, padded, VERTICAL));
     }
-    
-    lines.push(format!("{}{}{}", BOTTOM_LEFT, HORIZONTAL.to_string().repeat(inner_width), BOTTOM_RIGHT));
-    
+
+    lines.push(format!(
+        "{}{}{}",
+        BOTTOM_LEFT,
+        HORIZONTAL.to_string().repeat(inner_width),
+        BOTTOM_RIGHT
+    ));
+
     lines.join("\n")
 }
 

@@ -13,7 +13,9 @@ use colored::Colorize;
 
 const FULL_BLOCK: char = '█';
 const LIGHT_BLOCK: char = '░';
+#[allow(dead_code)]
 const MED_BLOCK: char = '▒';
+#[allow(dead_code)]
 const EMPTY_BLOCK: char = ' ';
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -22,10 +24,14 @@ const EMPTY_BLOCK: char = ' ';
 
 /// Renderiza una barra de progreso ASCII.
 pub fn render_bar(value: f64, max: f64, width: usize) -> String {
-    let ratio = if max > 0.0 { (value / max).min(1.0) } else { 0.0 };
+    let ratio = if max > 0.0 {
+        (value / max).min(1.0)
+    } else {
+        0.0
+    };
     let filled = (ratio * width as f64).round() as usize;
     let empty = width.saturating_sub(filled);
-    
+
     format!(
         "{}{}",
         FULL_BLOCK.to_string().repeat(filled),
@@ -36,7 +42,7 @@ pub fn render_bar(value: f64, max: f64, width: usize) -> String {
 /// Renderiza barra con color según porcentaje.
 pub fn render_colored_bar(percent: f64, width: usize) -> String {
     let bar = render_bar(percent, 100.0, width);
-    
+
     if percent >= 90.0 {
         bar.green().to_string()
     } else if percent >= 70.0 {
@@ -61,8 +67,14 @@ pub fn render_labeled_bar(label: &str, percent: f64, width: usize, label_width: 
     } else {
         pct.red()
     };
-    
-    format!("{:width$} {} {}", label, bar, pct_colored, width = label_width)
+
+    format!(
+        "{:width$} {} {}",
+        label,
+        bar,
+        pct_colored,
+        width = label_width
+    )
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -80,17 +92,19 @@ pub struct ModuleHeat {
 
 /// Renderiza un heatmap de módulos.
 pub fn render_coverage_heatmap(modules: &[ModuleHeat], bar_width: usize) -> String {
-    let max_name = modules.iter()
-        .map(|m| m.name.len())
-        .max()
-        .unwrap_or(10);
-    
+    let max_name = modules.iter().map(|m| m.name.len()).max().unwrap_or(10);
+
     let mut lines = Vec::new();
-    
+
     for module in modules {
-        lines.push(render_labeled_bar(&module.name, module.coverage, bar_width, max_name));
+        lines.push(render_labeled_bar(
+            &module.name,
+            module.coverage,
+            bar_width,
+            max_name,
+        ));
     }
-    
+
     lines.join("\n")
 }
 
@@ -122,13 +136,14 @@ pub fn heat_row(values: &[f64]) -> String {
 /// Sparkline simple.
 pub fn sparkline(values: &[f64]) -> String {
     const CHARS: [char; 8] = ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
-    
+
     let max = values.iter().cloned().fold(0.0_f64, f64::max);
     if max == 0.0 {
         return " ".repeat(values.len());
     }
-    
-    values.iter()
+
+    values
+        .iter()
         .map(|v| {
             let idx = ((v / max) * 7.0).round() as usize;
             CHARS[idx.min(7)]
@@ -139,8 +154,10 @@ pub fn sparkline(values: &[f64]) -> String {
 /// Mini barra horizontal.
 pub fn mini_bar(value: f64, max: f64) -> char {
     const CHARS: [char; 9] = [' ', '▏', '▎', '▍', '▌', '▋', '▊', '▉', '█'];
-    
-    if max == 0.0 { return ' '; }
+
+    if max == 0.0 {
+        return ' ';
+    }
     let ratio = (value / max).min(1.0);
     let idx = (ratio * 8.0).round() as usize;
     CHARS[idx.min(8)]

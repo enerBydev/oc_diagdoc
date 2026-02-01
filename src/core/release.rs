@@ -24,19 +24,19 @@ impl VersionInfo {
             build_date: chrono::Utc::now().format("%Y-%m-%d").to_string(),
         })
     }
-    
+
     pub fn with_git_hash(mut self, hash: &str) -> Self {
         self.git_hash = Some(hash.to_string());
         self
     }
-    
+
     pub fn display_string(&self) -> String {
         match &self.git_hash {
             Some(hash) => format!("{} ({})", self.version, &hash[..7.min(hash.len())]),
             None => self.version.to_string(),
         }
     }
-    
+
     pub fn is_prerelease(&self) -> bool {
         !self.version.pre.is_empty()
     }
@@ -81,17 +81,17 @@ impl ReleaseChecklist {
             ],
         }
     }
-    
+
     pub fn check(&mut self, index: usize) {
         if let Some(item) = self.items.get_mut(index) {
             item.1 = true;
         }
     }
-    
+
     pub fn is_complete(&self) -> bool {
         self.items.iter().all(|(_, done)| *done)
     }
-    
+
     pub fn progress(&self) -> f64 {
         let done = self.items.iter().filter(|(_, d)| *d).count();
         done as f64 / self.items.len() as f64
@@ -110,13 +110,14 @@ mod tests {
 
     #[test]
     fn test_version_info_new() {
-        let info = VersionInfo::new("3.0.0").unwrap();
+        let info = VersionInfo::new("3.0.1").unwrap();
         assert_eq!(info.version.major, 3);
     }
 
     #[test]
     fn test_version_display() {
-        let info = VersionInfo::new("1.2.3").unwrap()
+        let info = VersionInfo::new("1.2.3")
+            .unwrap()
             .with_git_hash("abc1234567890");
         assert!(info.display_string().contains("abc1234"));
     }

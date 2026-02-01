@@ -34,7 +34,7 @@ impl CommandMeta {
             aliases: Vec::new(),
         }
     }
-    
+
     pub fn with_alias(mut self, alias: &str) -> Self {
         self.aliases.push(alias.to_string());
         self
@@ -52,45 +52,46 @@ impl CommandRegistry {
     pub fn new() -> Self {
         Self::default()
     }
-    
+
     pub fn register(&mut self, meta: CommandMeta) {
         for alias in &meta.aliases {
             self.commands.insert(alias.clone(), meta.clone());
         }
         self.commands.insert(meta.name.clone(), meta);
     }
-    
+
     pub fn register_plugin<P: Plugin + 'static>(&mut self, plugin: P) {
         let name = plugin.name().to_string();
         self.plugins.insert(name, Arc::new(plugin));
     }
-    
+
     pub fn get(&self, name: &str) -> Option<&CommandMeta> {
         self.commands.get(name)
     }
-    
+
     pub fn get_plugin(&self, name: &str) -> Option<Arc<dyn Plugin>> {
         self.plugins.get(name).cloned()
     }
-    
+
     pub fn list_commands(&self) -> Vec<&CommandMeta> {
         let mut seen = std::collections::HashSet::new();
-        self.commands.values()
+        self.commands
+            .values()
             .filter(|meta| seen.insert(&meta.name))
             .collect()
     }
-    
+
     pub fn list_by_category(&self, category: &str) -> Vec<&CommandMeta> {
         self.list_commands()
             .into_iter()
             .filter(|meta| meta.category == category)
             .collect()
     }
-    
+
     pub fn command_count(&self) -> usize {
         self.list_commands().len()
     }
-    
+
     pub fn plugin_count(&self) -> usize {
         self.plugins.len()
     }
@@ -103,30 +104,61 @@ pub struct RegistryBuilder {
 
 impl RegistryBuilder {
     pub fn new() -> Self {
-        Self { registry: CommandRegistry::new() }
+        Self {
+            registry: CommandRegistry::new(),
+        }
     }
-    
+
     pub fn with_builtins(mut self) -> Self {
         // Comandos analíticos
-        self.registry.register(CommandMeta::new("verify", "Verificar documentación", "analytics"));
-        self.registry.register(CommandMeta::new("stats", "Estadísticas", "analytics"));
-        self.registry.register(CommandMeta::new("search", "Buscar contenido", "analytics"));
-        self.registry.register(CommandMeta::new("deps", "Dependencias", "analytics"));
-        self.registry.register(CommandMeta::new("tree", "Árbol jerárquico", "analytics"));
-        
+        self.registry.register(CommandMeta::new(
+            "verify",
+            "Verificar documentación",
+            "analytics",
+        ));
+        self.registry
+            .register(CommandMeta::new("stats", "Estadísticas", "analytics"));
+        self.registry
+            .register(CommandMeta::new("search", "Buscar contenido", "analytics"));
+        self.registry
+            .register(CommandMeta::new("deps", "Dependencias", "analytics"));
+        self.registry
+            .register(CommandMeta::new("tree", "Árbol jerárquico", "analytics"));
+
         // Comandos de modificación
-        self.registry.register(CommandMeta::new("batch", "Operaciones en lote", "modification"));
-        self.registry.register(CommandMeta::new("sync", "Sincronizar metadatos", "modification"));
-        self.registry.register(CommandMeta::new("links", "Gestión de enlaces", "modification"));
-        
+        self.registry.register(CommandMeta::new(
+            "batch",
+            "Operaciones en lote",
+            "modification",
+        ));
+        self.registry.register(CommandMeta::new(
+            "sync",
+            "Sincronizar metadatos",
+            "modification",
+        ));
+        self.registry.register(CommandMeta::new(
+            "links",
+            "Gestión de enlaces",
+            "modification",
+        ));
+
         // Comandos de diagnóstico
-        self.registry.register(CommandMeta::new("lint", "Análisis estático", "diagnostic"));
-        self.registry.register(CommandMeta::new("health", "Salud del proyecto", "diagnostic"));
-        self.registry.register(CommandMeta::new("coverage", "Cobertura de contenido", "diagnostic"));
-        
+        self.registry
+            .register(CommandMeta::new("lint", "Análisis estático", "diagnostic"));
+        self.registry.register(CommandMeta::new(
+            "health",
+            "Salud del proyecto",
+            "diagnostic",
+        ));
+        self.registry.register(CommandMeta::new(
+            "coverage",
+            "Cobertura de contenido",
+            "diagnostic",
+        ));
+
         self
     }
-    
+
     pub fn build(self) -> CommandRegistry {
         self.registry
     }

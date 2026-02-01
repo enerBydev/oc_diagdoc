@@ -1,8 +1,8 @@
 //! Estados de documentos.
 
+use crate::errors::OcError;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
-use crate::errors::OcError;
 
 /// Estado de un documento.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
@@ -52,7 +52,7 @@ impl DocumentStatus {
             Self::Stub => "📝",
         }
     }
-    
+
     /// Todos los estados posibles.
     pub fn all() -> &'static [Self] {
         &[
@@ -99,13 +99,19 @@ impl std::fmt::Display for DocumentStatus {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_status_parsing() {
-        assert_eq!("active".parse::<DocumentStatus>().unwrap(), DocumentStatus::Active);
-        assert_eq!("activo".parse::<DocumentStatus>().unwrap(), DocumentStatus::Active);
+        assert_eq!(
+            "active".parse::<DocumentStatus>().unwrap(),
+            DocumentStatus::Active
+        );
+        assert_eq!(
+            "activo".parse::<DocumentStatus>().unwrap(),
+            DocumentStatus::Active
+        );
     }
-    
+
     #[test]
     fn test_healthy() {
         assert!(DocumentStatus::Active.is_healthy());

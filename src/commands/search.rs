@@ -2,10 +2,9 @@
 //!
 //! Búsqueda por contenido y metadata YAML.
 
-use std::path::PathBuf;
-use clap::Parser;
-use regex::Regex;
 use crate::errors::OcResult;
+use clap::Parser;
+use std::path::PathBuf;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SEARCH RESULT
@@ -47,13 +46,13 @@ impl SearchMatch {
             context_after: Vec::new(),
         }
     }
-    
+
     /// Línea con highlight.
     pub fn highlighted_line(&self) -> String {
         let before = &self.line_content[..self.match_start];
         let matched = &self.line_content[self.match_start..self.match_start + self.match_length];
         let after = &self.line_content[self.match_start + self.match_length..];
-        
+
         format!("{}\x1b[1;33m{}\x1b[0m{}", before, matched, after)
     }
 }
@@ -76,11 +75,11 @@ impl SearchResults {
             total_lines_searched: 0,
         }
     }
-    
+
     pub fn match_count(&self) -> usize {
         self.matches.len()
     }
-    
+
     pub fn files_with_matches(&self) -> usize {
         let mut paths: Vec<_> = self.matches.iter().map(|m| &m.file_path).collect();
         paths.sort();
@@ -99,31 +98,31 @@ impl SearchResults {
 pub struct SearchCommand {
     /// Patrón de búsqueda.
     pub pattern: String,
-    
+
     /// Ruta del proyecto.
     #[arg(short, long)]
     pub path: Option<PathBuf>,
-    
+
     /// Usar regex.
     #[arg(short, long)]
     pub regex: bool,
-    
+
     /// Búsqueda case-insensitive.
     #[arg(short, long)]
     pub ignore_case: bool,
-    
+
     /// Buscar en YAML frontmatter.
     #[arg(long)]
     pub yaml: bool,
-    
+
     /// Buscar solo en contenido.
     #[arg(long)]
     pub content_only: bool,
-    
+
     /// Líneas de contexto.
     #[arg(short = 'C', long, default_value = "2")]
     pub context: usize,
-    
+
     /// Máximo de resultados.
     #[arg(short, long)]
     pub max_results: Option<usize>,
@@ -133,9 +132,9 @@ impl SearchCommand {
     /// Ejecuta la búsqueda.
     pub fn run(&self, data_dir: &std::path::Path) -> OcResult<SearchResults> {
         use crate::core::files::{get_all_md_files, read_file_content, ScanOptions};
-        
+
         let mut results = SearchResults::new(&self.pattern);
-        
+
         // Compilar regex si es necesario
         let _regex_pattern = if self.regex {
             if self.ignore_case {
@@ -146,22 +145,22 @@ impl SearchCommand {
         } else {
             None
         };
-        
+
         // Escanear todos los archivos
         let options = ScanOptions::new();
         let files = get_all_md_files(data_dir, &options)?;
-        
+
         results.files_searched = files.len();
-        
+
         for file_path in files {
             if let Ok(content) = read_file_content(&file_path) {
                 results.total_lines_searched += content.lines().count();
-                
+
                 let matches = self.search_in_content(&content, &file_path);
-                
+
                 for m in matches {
                     results.matches.push(m);
-                    
+
                     // Limitar resultados si hay máximo
                     if let Some(max) = self.max_results {
                         if results.matches.len() >= max {
@@ -171,10 +170,10 @@ impl SearchCommand {
                 }
             }
         }
-        
+
         Ok(results)
     }
-    
+
     /// Busca en un contenido.
     pub fn search_in_content(&self, content: &str, file_path: &PathBuf) -> Vec<SearchMatch> {
         let mut matches = Vec::new();
@@ -183,14 +182,14 @@ impl SearchCommand {
         } else {
             self.pattern.clone()
         };
-        
+
         for (line_idx, line) in content.lines().enumerate() {
             let search_line = if self.ignore_case {
                 line.to_lowercase()
             } else {
                 line.to_string()
             };
-            
+
             if let Some(pos) = search_line.find(&pattern) {
                 matches.push(SearchMatch::new(
                     file_path.clone(),
@@ -199,7 +198,7 @@ impl SearchCommand {
                     pos,
                     pattern.len(),
                 ));
-                
+
                 if let Some(max) = self.max_results {
                     if matches.len() >= max {
                         break;
@@ -207,7 +206,7 @@ impl SearchCommand {
                 }
             }
         }
-        
+
         matches
     }
 }
@@ -218,14 +217,8 @@ mod tests {
 
     #[test]
     fn test_search_match_new() {
-        let m = SearchMatch::new(
-            PathBuf::from("test.md"),
-            1,
-            "hello world".to_string(),
-            0,
-            5,
-        );
-        
+        let m = SearchMatch::new(PathBuf::from("test.md"), 1, "hello world".to_string(), 0, 5);
+
         assert_eq!(m.line_number, 1);
     }
 
@@ -247,24 +240,18 @@ mod tests {
             context: 2,
             max_results: None,
         };
-        
+
         let content = "line1\nhello world\nline3";
         let matches = cmd.search_in_content(content, &PathBuf::from("test.md"));
-        
+
         assert_eq!(matches.len(), 1);
         assert_eq!(matches[0].line_number, 2);
     }
 
     #[test]
     fn test_highlighted_line() {
-        let m = SearchMatch::new(
-            PathBuf::from("test.md"),
-            1,
-            "hello world".to_string(),
-            0,
-            5,
-        );
-        
+        let m = SearchMatch::new(PathBuf::from("test.md"), 1, "hello world".to_string(), 0, 5);
+
         let highlighted = m.highlighted_line();
         assert!(highlighted.contains("\x1b[1;33m"));
     }
@@ -273,23 +260,31 @@ mod tests {
 /// Función de ejecución para CLI.
 #[cfg(feature = "cli")]
 pub fn run(cmd: SearchCommand, cli: &crate::CliConfig) -> anyhow::Result<()> {
-    let data_dir = std::path::Path::new(&cli.data_dir);
+    // F6: Corregir path handling
+    let default_dir = std::path::PathBuf::from(&cli.data_dir);
+    let data_dir = cmd.path.as_ref().unwrap_or(&default_dir);
     let results = cmd.run(data_dir)?;
-    
+
     if results.matches.is_empty() {
         println!("🔍 No se encontraron resultados para: {}", results.query);
     } else {
-        println!("🔍 {} resultados para '{}' en {} archivos ({} líneas buscadas)\n",
-            results.match_count(), results.query, results.files_with_matches(), results.total_lines_searched);
-        
+        println!(
+            "🔍 {} resultados para '{}' en {} archivos ({} líneas buscadas)\n",
+            results.match_count(),
+            results.query,
+            results.files_with_matches(),
+            results.total_lines_searched
+        );
+
         for m in &results.matches {
-            println!("{}:{}: {}", 
-                m.file_path.display(), 
-                m.line_number, 
+            println!(
+                "{}:{}: {}",
+                m.file_path.display(),
+                m.line_number,
                 m.highlighted_line()
             );
         }
     }
-    
+
     Ok(())
 }

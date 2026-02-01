@@ -5,32 +5,24 @@
 //! - Links Markdown: [text](url)
 //! - Embeds: ![[image]] y ![alt](url)
 
-use std::path::{Path, PathBuf};
-use std::collections::HashSet;
-use regex::Regex;
 use once_cell::sync::Lazy;
-use serde::{Serialize, Deserialize};
-use crate::errors::{OcError, OcResult};
+use regex::Regex;
+use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
+use std::path::{Path, PathBuf};
 
 /// Patrón para links Obsidian: [[target]] o [[target|alias]]
-static OBSIDIAN_LINK: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"\[\[([^\]|]+)(?:\|([^\]]+))?\]\]").unwrap()
-});
+static OBSIDIAN_LINK: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"\[\[([^\]|]+)(?:\|([^\]]+))?\]\]").unwrap());
 
 /// Patrón para links Markdown: [text](url)
-static MD_LINK: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"\[([^\]]*)\]\(([^)]+)\)").unwrap()
-});
+static MD_LINK: Lazy<Regex> = Lazy::new(|| Regex::new(r"\[([^\]]*)\]\(([^)]+)\)").unwrap());
 
 /// Patrón para embeds Obsidian: ![[file]]
-static OBSIDIAN_EMBED: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"!\[\[([^\]]+)\]\]").unwrap()
-});
+static OBSIDIAN_EMBED: Lazy<Regex> = Lazy::new(|| Regex::new(r"!\[\[([^\]]+)\]\]").unwrap());
 
 /// Patrón para embeds Markdown: ![alt](url)
-static MD_EMBED: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"!\[([^\]]*)\]\(([^)]+)\)").unwrap()
-});
+static MD_EMBED: Lazy<Regex> = Lazy::new(|| Regex::new(r"!\[([^\]]*)\]\(([^)]+)\)").unwrap());
 
 /// Tipo de enlace detectado.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -65,35 +57,38 @@ pub struct Link {
 impl Link {
     /// ¿Es un enlace interno (no HTTP)?
     pub fn is_internal(&self) -> bool {
-        !self.target.starts_with("http://") && 
-        !self.target.starts_with("https://") &&
-        !self.target.starts_with("mailto:")
+        !self.target.starts_with("http://")
+            && !self.target.starts_with("https://")
+            && !self.target.starts_with("mailto:")
     }
-    
+
     /// ¿Es un enlace externo?
     pub fn is_external(&self) -> bool {
         !self.is_internal()
     }
-    
+
     /// ¿Es un embed (imagen/archivo)?
     pub fn is_embed(&self) -> bool {
-        matches!(self.link_type, LinkType::ObsidianEmbed | LinkType::MarkdownEmbed)
+        matches!(
+            self.link_type,
+            LinkType::ObsidianEmbed | LinkType::MarkdownEmbed
+        )
     }
-    
+
     /// Normaliza el target para comparación.
     pub fn normalized_target(&self) -> String {
         let mut target = self.target.clone();
-        
+
         // Remover anclas (#section)
         if let Some(pos) = target.find('#') {
             target = target[..pos].to_string();
         }
-        
+
         // Agregar .md si no tiene extensión
         if !target.contains('.') && self.is_internal() && !self.is_embed() {
             target.push_str(".md");
         }
-        
+
         target
     }
 }
@@ -112,7 +107,7 @@ pub struct BrokenLink {
 /// Extrae todos los enlaces de un contenido.
 pub fn extract_links(content: &str) -> Vec<Link> {
     let mut links = Vec::new();
-    
+
     // Obsidian embeds primero (para no confundir con links)
     for cap in OBSIDIAN_EMBED.captures_iter(content) {
         let full_match = cap.get(0).unwrap();
@@ -124,7 +119,7 @@ pub fn extract_links(content: &str) -> Vec<Link> {
             raw: full_match.as_str().to_string(),
         });
     }
-    
+
     // Markdown embeds
     for cap in MD_EMBED.captures_iter(content) {
         let full_match = cap.get(0).unwrap();
@@ -136,7 +131,7 @@ pub fn extract_links(content: &str) -> Vec<Link> {
             raw: full_match.as_str().to_string(),
         });
     }
-    
+
     // Obsidian links [[target]] o [[target|alias]]
     for cap in OBSIDIAN_LINK.captures_iter(content) {
         let full_match = cap.get(0).unwrap();
@@ -152,7 +147,7 @@ pub fn extract_links(content: &str) -> Vec<Link> {
             raw: full_match.as_str().to_string(),
         });
     }
-    
+
     // Markdown links [text](url)
     for cap in MD_LINK.captures_iter(content) {
         let full_match = cap.get(0).unwrap();
@@ -174,10 +169,10 @@ pub fn extract_links(content: &str) -> Vec<Link> {
             raw: full_match.as_str().to_string(),
         });
     }
-    
+
     // Ordenar por posición
     links.sort_by_key(|l| l.position);
-    
+
     links
 }
 
@@ -189,19 +184,19 @@ pub fn validate_links(
 ) -> Vec<BrokenLink> {
     let mut broken = Vec::new();
     let source_dir = source_file.parent().unwrap_or(Path::new("."));
-    
+
     for link in links {
         // Skip externos
         if link.is_external() {
             continue;
         }
-        
+
         let target = link.normalized_target();
-        
+
         // Resolver path relativo
         let resolved = source_dir.join(&target);
         let resolved_canonical = resolved.canonicalize().ok();
-        
+
         // Verificar si existe
         let exists = if let Some(canonical) = &resolved_canonical {
             known_files.contains(canonical)
@@ -214,7 +209,7 @@ pub fn validate_links(
                     .unwrap_or(false)
             })
         };
-        
+
         if !exists {
             broken.push(BrokenLink {
                 link: link.clone(),
@@ -223,7 +218,7 @@ pub fn validate_links(
             });
         }
     }
-    
+
     broken
 }
 
@@ -241,7 +236,7 @@ pub fn replace_link(content: &str, old_target: &str, new_target: &str) -> String
             caps[0].to_string()
         }
     });
-    
+
     // Reemplazar en MD links
     let result = MD_LINK.replace_all(&result, |caps: &regex::Captures| {
         if &caps[2] == old_target {
@@ -250,7 +245,7 @@ pub fn replace_link(content: &str, old_target: &str, new_target: &str) -> String
             caps[0].to_string()
         }
     });
-    
+
     result.to_string()
 }
 
@@ -261,7 +256,7 @@ pub fn convert_obsidian_to_md(content: &str) -> String {
         let target = &caps[1];
         format!("![{}]({})", target, target)
     });
-    
+
     // Convertir links [[target|alias]] → [alias](target.md)
     let result = OBSIDIAN_LINK.replace_all(&result, |caps: &regex::Captures| {
         let target = &caps[1];
@@ -273,7 +268,7 @@ pub fn convert_obsidian_to_md(content: &str) -> String {
         };
         format!("[{}]({})", text, target_with_ext)
     });
-    
+
     result.to_string()
 }
 
@@ -294,7 +289,7 @@ mod tests {
     fn test_extract_obsidian_links() {
         let content = "Ver [[documento]] y [[otro|alias]] para más info.";
         let links = extract_links(content);
-        
+
         assert_eq!(links.len(), 2);
         assert_eq!(links[0].target, "documento");
         assert_eq!(links[1].target, "otro");
@@ -305,7 +300,7 @@ mod tests {
     fn test_extract_md_links() {
         let content = "Ver [texto](archivo.md) y [externo](https://example.com).";
         let links = extract_links(content);
-        
+
         assert_eq!(links.len(), 2);
         assert_eq!(links[0].link_type, LinkType::Markdown);
         assert_eq!(links[1].link_type, LinkType::External);
@@ -315,7 +310,7 @@ mod tests {
     fn test_extract_embeds() {
         let content = "Imagen: ![[foto.png]] y ![alt](imagen.jpg).";
         let links = extract_links(content);
-        
+
         assert_eq!(links.len(), 2);
         assert!(links[0].is_embed());
         assert!(links[1].is_embed());
@@ -325,7 +320,7 @@ mod tests {
     fn test_convert_obsidian_to_md() {
         let obsidian = "Ver [[documento]] y [[otro|con alias]].";
         let md = convert_obsidian_to_md(obsidian);
-        
+
         assert!(md.contains("[documento](documento.md)"));
         assert!(md.contains("[con alias](otro.md)"));
     }
@@ -334,7 +329,7 @@ mod tests {
     fn test_replace_link() {
         let content = "Ver [[viejo]] y [texto](viejo.md).";
         let updated = replace_link(content, "viejo", "nuevo");
-        
+
         assert!(updated.contains("[[nuevo]]"));
         // MD links no se reemplazan (target diferente)
     }
@@ -357,10 +352,10 @@ mod tests {
                 raw: "[[noexiste.md]]".to_string(),
             },
         ];
-        
+
         let mut known = HashSet::new();
         known.insert(PathBuf::from("/docs/existe.md"));
-        
+
         let broken = validate_links(&links, Path::new("/docs/source.md"), &known);
         assert_eq!(broken.len(), 1);
         assert!(broken[0].link.target.contains("noexiste"));

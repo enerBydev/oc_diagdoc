@@ -2,9 +2,9 @@
 //!
 //! Detecta problemas de estilo y estructura.
 
-use std::path::PathBuf;
-use clap::Parser;
 use crate::errors::OcResult;
+use clap::Parser;
+use std::path::PathBuf;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // LINT TYPES
@@ -41,7 +41,7 @@ impl LintIssue {
             fixable: false,
         }
     }
-    
+
     pub fn warning(code: &str, message: &str, file: PathBuf) -> Self {
         Self {
             code: code.to_string(),
@@ -70,19 +70,25 @@ impl LintResult {
             files_with_issues: 0,
         }
     }
-    
+
     pub fn error_count(&self) -> usize {
-        self.issues.iter().filter(|i| i.severity == LintSeverity::Error).count()
+        self.issues
+            .iter()
+            .filter(|i| i.severity == LintSeverity::Error)
+            .count()
     }
-    
+
     pub fn warning_count(&self) -> usize {
-        self.issues.iter().filter(|i| i.severity == LintSeverity::Warning).count()
+        self.issues
+            .iter()
+            .filter(|i| i.severity == LintSeverity::Warning)
+            .count()
     }
-    
+
     pub fn fixable_count(&self) -> usize {
         self.issues.iter().filter(|i| i.fixable).count()
     }
-    
+
     pub fn is_clean(&self) -> bool {
         self.error_count() == 0 && self.warning_count() == 0
     }
@@ -105,37 +111,56 @@ pub struct LintCommand {
     /// Ruta del proyecto.
     #[arg(short, long)]
     pub path: Option<PathBuf>,
-    
-    /// Corregir automáticamente.
+
+    /// Corregir automáticamente problemas fixables.
     #[arg(long)]
     pub fix: bool,
-    
-    /// Solo errores.
+
+    /// Solo errores, omitir warnings/hints.
     #[arg(long)]
     pub errors_only: bool,
-    
+
     /// Output formato JSON.
     #[arg(long)]
     pub json: bool,
+
+    // L4: Flags avanzados
+    /// Ejecutar solo regla específica (ej: L001, L003).
+    #[arg(long, value_name = "RULE")]
+    pub rule: Option<String>,
+
+    /// Mostrar estadísticas por categoría.
+    #[arg(long)]
+    pub summary: bool,
 }
 
 impl LintCommand {
     pub fn run(&self, data_dir: &std::path::Path) -> OcResult<LintResult> {
         use crate::core::files::{get_all_md_files, read_file_content, ScanOptions};
         use std::collections::HashSet;
-        
+
         let mut result = LintResult::new();
-        
+        let mut files_fixed = 0usize;
+
         let options = ScanOptions::new();
         let files = get_all_md_files(data_dir, &options)?;
-        
+
         result.files_checked = files.len();
         let mut files_with_issues_set: HashSet<PathBuf> = HashSet::new();
-        
+
         for file_path in &files {
             if let Ok(content) = read_file_content(file_path) {
+                // L4.4: Aplicar --fix si se solicitó
+                if self.fix {
+                    if let Some(fixed_content) = self.fix_file(file_path, &content) {
+                        if std::fs::write(file_path, &fixed_content).is_ok() {
+                            files_fixed += 1;
+                        }
+                    }
+                }
+
                 let issues = self.lint_file(file_path, &content);
-                
+
                 if !issues.is_empty() {
                     files_with_issues_set.insert(file_path.clone());
                     for issue in issues {
@@ -147,43 +172,75 @@ impl LintCommand {
                 }
             }
         }
-        
+
         result.files_with_issues = files_with_issues_set.len();
+
+        // Agregar estadística de archivos corregidos (usar info log si hay fix)
+        if self.fix && files_fixed > 0 {
+            eprintln!("✅ {} archivos corregidos automáticamente", files_fixed);
+        }
+
         Ok(result)
     }
-    
+
     /// Aplica todas las reglas a un archivo.
     fn lint_file(&self, file_path: &PathBuf, content: &str) -> Vec<LintIssue> {
         let mut issues = Vec::new();
         let lines: Vec<&str> = content.lines().collect();
-        
+
         // Regla 1: Archivo debe tener frontmatter YAML
-        issues.extend(self.rule_frontmatter(file_path, content));
-        
+        if self.should_run_rule("L001") {
+            issues.extend(self.rule_frontmatter(file_path, content));
+        }
+
         // Regla 2: Headers deben ser jerárquicos
-        issues.extend(self.rule_header_hierarchy(file_path, &lines));
-        
+        if self.should_run_rule("L002") {
+            issues.extend(self.rule_header_hierarchy(file_path, &lines));
+        }
+
         // Regla 3: No trailing whitespace
-        issues.extend(self.rule_trailing_whitespace(file_path, &lines));
-        
+        if self.should_run_rule("L003") {
+            issues.extend(self.rule_trailing_whitespace(file_path, &lines));
+        }
+
         // Regla 4: Archivo termina con newline
-        issues.extend(self.rule_final_newline(file_path, content));
-        
+        if self.should_run_rule("L004") {
+            issues.extend(self.rule_final_newline(file_path, content));
+        }
+
         // Regla 5: No líneas > 300 caracteres (muy largas)
-        issues.extend(self.rule_line_length(file_path, &lines));
-        
+        if self.should_run_rule("L005") {
+            issues.extend(self.rule_line_length(file_path, &lines));
+        }
+
         // Regla 6: Code blocks deben tener lenguaje
-        issues.extend(self.rule_code_block_language(file_path, &lines));
-        
+        if self.should_run_rule("L006") {
+            issues.extend(self.rule_code_block_language(file_path, &lines));
+        }
+
         // Regla 7: Headers no duplicados
-        issues.extend(self.rule_duplicate_headers(file_path, &lines));
-        
+        if self.should_run_rule("L007") {
+            issues.extend(self.rule_duplicate_headers(file_path, &lines));
+        }
+
         // Regla 8: Frontmatter fields obligatorios
-        issues.extend(self.rule_required_fields(file_path, content));
-        
+        if self.should_run_rule("L008") {
+            issues.extend(self.rule_required_fields(file_path, content));
+        }
+
+        // L4: Regla 9: Tablas con header
+        if self.should_run_rule("L009") {
+            issues.extend(self.rule_table_headers(file_path, &lines));
+        }
+
+        // L4: Regla 10: Imágenes con alt text
+        if self.should_run_rule("L010") {
+            issues.extend(self.rule_image_alt(file_path, &lines));
+        }
+
         issues
     }
-    
+
     /// Regla: Archivo debe tener frontmatter YAML.
     fn rule_frontmatter(&self, file_path: &PathBuf, content: &str) -> Vec<LintIssue> {
         if !content.starts_with("---") {
@@ -198,16 +255,16 @@ impl LintCommand {
         }
         Vec::new()
     }
-    
+
     /// Regla: Headers deben ser jerárquicos (no saltar niveles).
     fn rule_header_hierarchy(&self, file_path: &PathBuf, lines: &[&str]) -> Vec<LintIssue> {
         let mut issues = Vec::new();
         let mut last_level = 0;
-        
+
         for (idx, line) in lines.iter().enumerate() {
             if line.starts_with('#') && !line.starts_with("```") {
                 let level = line.chars().take_while(|c| *c == '#').count();
-                
+
                 // No debe saltar más de 1 nivel
                 if last_level > 0 && level > last_level + 1 {
                     issues.push(LintIssue {
@@ -224,7 +281,7 @@ impl LintCommand {
         }
         issues
     }
-    
+
     /// Regla: No trailing whitespace.
     fn rule_trailing_whitespace(&self, file_path: &PathBuf, lines: &[&str]) -> Vec<LintIssue> {
         let mut issues = Vec::new();
@@ -242,7 +299,7 @@ impl LintCommand {
         }
         issues
     }
-    
+
     /// Regla: Archivo termina con newline.
     fn rule_final_newline(&self, file_path: &PathBuf, content: &str) -> Vec<LintIssue> {
         if !content.ends_with('\n') {
@@ -257,7 +314,7 @@ impl LintCommand {
         }
         Vec::new()
     }
-    
+
     /// Regla: Líneas no muy largas.
     fn rule_line_length(&self, file_path: &PathBuf, lines: &[&str]) -> Vec<LintIssue> {
         let mut issues = Vec::new();
@@ -275,7 +332,7 @@ impl LintCommand {
         }
         issues
     }
-    
+
     /// Regla: Code blocks deben tener lenguaje especificado.
     fn rule_code_block_language(&self, file_path: &PathBuf, lines: &[&str]) -> Vec<LintIssue> {
         let mut issues = Vec::new();
@@ -293,20 +350,23 @@ impl LintCommand {
         }
         issues
     }
-    
+
     /// Regla: Headers no duplicados.
     fn rule_duplicate_headers(&self, file_path: &PathBuf, lines: &[&str]) -> Vec<LintIssue> {
         use std::collections::HashMap;
         let mut issues = Vec::new();
         let mut seen: HashMap<String, usize> = HashMap::new();
-        
+
         for (idx, line) in lines.iter().enumerate() {
             if line.starts_with('#') && !line.starts_with("```") {
                 let header = line.trim_start_matches('#').trim().to_lowercase();
                 if let Some(prev_line) = seen.get(&header) {
                     issues.push(LintIssue {
                         code: "L007".to_string(),
-                        message: format!("Header duplicado (primera aparición línea {})", prev_line),
+                        message: format!(
+                            "Header duplicado (primera aparición línea {})",
+                            prev_line
+                        ),
                         file: file_path.clone(),
                         line: Some(idx + 1),
                         severity: LintSeverity::Warning,
@@ -319,19 +379,22 @@ impl LintCommand {
         }
         issues
     }
-    
+
     /// Regla: Campos obligatorios en frontmatter.
     fn rule_required_fields(&self, file_path: &PathBuf, content: &str) -> Vec<LintIssue> {
         let mut issues = Vec::new();
         let required = ["id:", "title:"];
-        
+
         // Solo revisar si tiene frontmatter
         if content.starts_with("---") {
             for field in required {
                 if !content.contains(field) {
                     issues.push(LintIssue {
                         code: "L008".to_string(),
-                        message: format!("Campo obligatorio faltante: {}", field.trim_end_matches(':')),
+                        message: format!(
+                            "Campo obligatorio faltante: {}",
+                            field.trim_end_matches(':')
+                        ),
                         file: file_path.clone(),
                         line: None,
                         severity: LintSeverity::Error,
@@ -341,6 +404,110 @@ impl LintCommand {
             }
         }
         issues
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // L4: REGLAS AVANZADAS
+    // ═══════════════════════════════════════════════════════════════════════
+
+    /// L4.2 Regla: Tablas deben tener fila de header.
+    fn rule_table_headers(&self, file_path: &PathBuf, lines: &[&str]) -> Vec<LintIssue> {
+        use regex::Regex;
+        let table_row = Regex::new(r"^\|.+\|$").unwrap();
+        let separator_row = Regex::new(r"^\|[\s:-]+\|$").unwrap();
+
+        let mut issues = Vec::new();
+        let mut i = 0;
+        while i < lines.len() {
+            if table_row.is_match(lines[i].trim()) {
+                // Verificar que la siguiente línea sea separador
+                if i + 1 >= lines.len() || !separator_row.is_match(lines[i + 1].trim()) {
+                    issues.push(LintIssue {
+                        code: "L009".to_string(),
+                        message: "Tabla sin fila de header/separador".to_string(),
+                        file: file_path.clone(),
+                        line: Some(i + 1),
+                        severity: LintSeverity::Warning,
+                        fixable: false,
+                    });
+                }
+                // Saltar hasta el final de la tabla
+                while i < lines.len() && table_row.is_match(lines[i].trim()) {
+                    i += 1;
+                }
+            } else {
+                i += 1;
+            }
+        }
+        issues
+    }
+
+    /// L4.3 Regla: Imágenes deben tener alt text.
+    fn rule_image_alt(&self, file_path: &PathBuf, lines: &[&str]) -> Vec<LintIssue> {
+        use regex::Regex;
+        // Busca ![](path) donde alt text está vacío
+        let empty_alt = Regex::new(r"!\[\]\([^)]+\)").unwrap();
+
+        let mut issues = Vec::new();
+        for (idx, line) in lines.iter().enumerate() {
+            if empty_alt.is_match(line) {
+                issues.push(LintIssue {
+                    code: "L010".to_string(),
+                    message: "Imagen sin alt text".to_string(),
+                    file: file_path.clone(),
+                    line: Some(idx + 1),
+                    severity: LintSeverity::Warning,
+                    fixable: false,
+                });
+            }
+        }
+        issues
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // L4.4: FIX AUTOMÁTICO
+    // ═══════════════════════════════════════════════════════════════════════
+
+    /// Corrige problemas fixables en un archivo.
+    pub fn fix_file(&self, _file_path: &PathBuf, content: &str) -> Option<String> {
+        let mut modified = false;
+        let mut new_content = String::new();
+
+        for line in content.lines() {
+            // Fix L003: Trailing whitespace
+            let trimmed = line.trim_end();
+            if trimmed != line {
+                modified = true;
+            }
+            new_content.push_str(trimmed);
+            new_content.push('\n');
+        }
+
+        // Fix L004: Asegurar newline final
+        if !content.ends_with('\n') {
+            modified = true;
+            // new_content ya termina con \n
+        }
+
+        // Remover newline extra al final si hay doble
+        while new_content.ends_with("\n\n") {
+            new_content.pop();
+            modified = true;
+        }
+
+        if modified {
+            Some(new_content)
+        } else {
+            None
+        }
+    }
+
+    /// Verifica si una regla debe ejecutarse según el filtro --rule.
+    fn should_run_rule(&self, rule_code: &str) -> bool {
+        match &self.rule {
+            Some(filter) => rule_code == filter,
+            None => true,
+        }
     }
 }
 
@@ -363,9 +530,13 @@ mod tests {
     #[test]
     fn test_error_count() {
         let mut result = LintResult::new();
-        result.issues.push(LintIssue::error("E001", "err", PathBuf::from("a.md")));
-        result.issues.push(LintIssue::warning("W001", "warn", PathBuf::from("b.md")));
-        
+        result
+            .issues
+            .push(LintIssue::error("E001", "err", PathBuf::from("a.md")));
+        result
+            .issues
+            .push(LintIssue::warning("W001", "warn", PathBuf::from("b.md")));
+
         assert_eq!(result.error_count(), 1);
         assert_eq!(result.warning_count(), 1);
     }
@@ -374,8 +545,10 @@ mod tests {
     fn test_is_clean() {
         let mut result = LintResult::new();
         assert!(result.is_clean());
-        
-        result.issues.push(LintIssue::error("E001", "err", PathBuf::from("a.md")));
+
+        result
+            .issues
+            .push(LintIssue::error("E001", "err", PathBuf::from("a.md")));
         assert!(!result.is_clean());
     }
 }
@@ -383,9 +556,11 @@ mod tests {
 /// Función run para CLI.
 #[cfg(feature = "cli")]
 pub fn run(cmd: LintCommand, cli: &crate::CliConfig) -> anyhow::Result<()> {
-    let data_dir = std::path::Path::new(&cli.data_dir);
+    // F1.1: Priorizar cmd.path sobre cli.data_dir
+    let default_dir = std::path::PathBuf::from(&cli.data_dir);
+    let data_dir = cmd.path.as_ref().unwrap_or(&default_dir);
     let result = cmd.run(data_dir)?;
-    
+
     for issue in &result.issues {
         let icon = match issue.severity {
             LintSeverity::Error => "❌",
@@ -394,19 +569,26 @@ pub fn run(cmd: LintCommand, cli: &crate::CliConfig) -> anyhow::Result<()> {
             LintSeverity::Hint => "💡",
         };
         let line_info = issue.line.map(|l| format!(":{}", l)).unwrap_or_default();
-        println!("{} [{}] {}{}: {}", icon, issue.code, issue.file.display(), line_info, issue.message);
+        println!(
+            "{} [{}] {}{}: {}",
+            icon,
+            issue.code,
+            issue.file.display(),
+            line_info,
+            issue.message
+        );
     }
-    
+
     println!("\n📊 Lint Report:");
     println!("  📁 Archivos analizados: {}", result.files_checked);
     println!("  📝 Archivos con issues: {}", result.files_with_issues);
     println!("  ❌ Errores: {}", result.error_count());
     println!("  ⚠️  Warnings: {}", result.warning_count());
     println!("  🔧 Fixables: {}", result.fixable_count());
-    
+
     if result.is_clean() {
         println!("\n✅ Sin problemas detectados");
     }
-    
+
     Ok(())
 }

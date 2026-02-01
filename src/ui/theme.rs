@@ -6,7 +6,7 @@
 //! - Emojis semánticos
 //! - Detección de soporte de colores
 
-use colored::{Colorize, ColoredString};
+use colored::{ColoredString, Colorize};
 use std::sync::atomic::{AtomicBool, Ordering};
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -59,7 +59,7 @@ pub mod colors {
     pub const SECONDARY: &str = "cyan";
     /// Color de acento.
     pub const ACCENT: &str = "magenta";
-    
+
     /// Éxito (verde).
     pub const SUCCESS: &str = "green";
     /// Advertencia (amarillo).
@@ -68,7 +68,7 @@ pub mod colors {
     pub const ERROR: &str = "red";
     /// Información (cian).
     pub const INFO: &str = "cyan";
-    
+
     /// Texto atenuado.
     pub const DIM: &str = "bright black";
     /// Texto destacado.
@@ -156,38 +156,38 @@ pub fn emoji(name: &str) -> &'static str {
         "warning" | "warn" => "⚠️",
         "info" | "i" => "ℹ️",
         "question" | "?" => "❓",
-        
+
         // Progreso
         "loading" | "spinner" => "⏳",
         "done" | "complete" => "✨",
         "wip" | "working" => "🔄",
         "pending" => "⏸️",
-        
+
         // Documentos
         "doc" | "document" | "file" => "📄",
         "folder" | "dir" => "📁",
         "link" => "🔗",
         "broken" => "💔",
-        
+
         // Análisis
         "search" | "find" => "🔍",
         "stats" | "chart" => "📊",
         "tree" => "🌳",
         "graph" => "📈",
-        
+
         // Acciones
         "add" | "plus" => "➕",
         "remove" | "minus" => "➖",
         "edit" | "pencil" => "✏️",
         "save" => "💾",
         "delete" | "trash" => "🗑️",
-        
+
         // OnlyCar específicos
         "car" => "🚗",
         "nuclear" => "☢️",
         "rust" => "🦀",
         "atom" => "⚛️",
-        
+
         // Misc
         "rocket" => "🚀",
         "fire" => "🔥",
@@ -195,7 +195,7 @@ pub fn emoji(name: &str) -> &'static str {
         "party" => "🎉",
         "bug" => "🐛",
         "fix" => "🔧",
-        
+
         _ => "•",
     }
 }
@@ -203,6 +203,170 @@ pub fn emoji(name: &str) -> &'static str {
 /// Icono con texto.
 pub fn icon(name: &str, text: &str) -> String {
     format!("{} {}", emoji(name), text)
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// F8: BANNER Y MEJORAS UX
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Banner ASCII de OnlyCar.
+pub fn print_banner() {
+    let banner = r#"
+╔═══════════════════════════════════════════════════════════════════════════╗
+║   ___              _         _____              _   _  _     ____         ║
+║  / _ \  _ __  | | _   _ / ____|__ _ _ __   | \ | || |   |  _ \         ║
+║ | | | || '_ \ | || | | || |    / _` || '__|  |  \| || |   | | | |        ║
+║ | |_| || | | || || |_| || |___| (_| || |     | |\  || |___| |_| |        ║
+║  \___/ |_| |_||_| \__, | \_____\__,_||_|     |_| \_||_____|____/         ║
+║                    |___/                                                   ║
+║                                                                           ║
+║   🚗 oc_diagdoc v3.0.1  |  Motor Algorítmico Nuclear  |  🦀 Rust Puro     ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+"#;
+    println!("{}", banner.cyan());
+}
+
+/// Banner compacto.
+pub fn print_banner_compact() {
+    println!(
+        "{}",
+        "══════════════════════════════════════════════".cyan()
+    );
+    println!(
+        "  {} {} {}",
+        "🚗".to_string(),
+        "oc_diagdoc v3.0.1".blue().bold(),
+        "| Motor Algorítmico Nuclear".dimmed()
+    );
+    println!(
+        "{}",
+        "══════════════════════════════════════════════".cyan()
+    );
+}
+
+/// Imprime un separador.
+pub fn print_separator() {
+    println!(
+        "{}",
+        "═══════════════════════════════════════════════════════".dimmed()
+    );
+}
+
+/// Imprime un separador ligero.
+pub fn print_separator_light() {
+    println!(
+        "{}",
+        "───────────────────────────────────────────────────────".bright_black()
+    );
+}
+
+/// Imprime header de sección.
+pub fn print_section_header(title: &str) {
+    println!();
+    println!("{} {}", "▶".cyan(), title.bold());
+    println!("{}", "─".repeat(50).bright_black());
+}
+
+/// Imprime un resumen de operación.
+pub fn print_summary(label: &str, value: &str, status_ok: bool) {
+    let status_icon = if status_ok { "✅" } else { "⚠️" };
+    let value_colored = if status_ok {
+        value.green().to_string()
+    } else {
+        value.yellow().to_string()
+    };
+    println!("  {} {}: {}", status_icon, label.dimmed(), value_colored);
+}
+
+/// Imprime estadística formateada.
+pub fn print_stat(label: &str, value: usize, suffix: &str) {
+    println!(
+        "  {} {}: {} {}",
+        "•".cyan(),
+        label,
+        value.to_string().blue().bold(),
+        suffix.dimmed()
+    );
+}
+
+/// Imprime error formateado.
+pub fn print_error_box(title: &str, message: &str) {
+    println!();
+    println!(
+        "{}",
+        "┌─ ❌ ERROR ─────────────────────────────────────────┐".red()
+    );
+    println!("{} {}", "│".red(), title.red().bold());
+    println!("{} {}", "│".red(), message);
+    println!(
+        "{}",
+        "└────────────────────────────────────────────────────┘".red()
+    );
+}
+
+/// Imprime warning formateado.
+pub fn print_warning_box(title: &str, message: &str) {
+    println!();
+    println!(
+        "{}",
+        "┌─ ⚠️ WARNING ──────────────────────────────────────┐".yellow()
+    );
+    println!("{} {}", "│".yellow(), title.yellow().bold());
+    println!("{} {}", "│".yellow(), message);
+    println!(
+        "{}",
+        "└────────────────────────────────────────────────────┘".yellow()
+    );
+}
+
+/// Imprime success box.
+pub fn print_success_box(title: &str, message: &str) {
+    println!();
+    println!(
+        "{}",
+        "┌─ ✅ SUCCESS ──────────────────────────────────────┐".green()
+    );
+    println!("{} {}", "│".green(), title.green().bold());
+    println!("{} {}", "│".green(), message);
+    println!(
+        "{}",
+        "└────────────────────────────────────────────────────┘".green()
+    );
+}
+
+/// Imprime tabla de stats resumida.
+pub fn print_stats_table(items: &[(&str, usize)]) {
+    println!();
+    println!(
+        "{}",
+        "┌────────────────────────────────┬──────────┐".dimmed()
+    );
+    println!(
+        "{} {:^30} {} {:^8} {}",
+        "│".dimmed(),
+        "Métrica".bold(),
+        "│".dimmed(),
+        "Valor".bold(),
+        "│".dimmed()
+    );
+    println!(
+        "{}",
+        "├────────────────────────────────┼──────────┤".dimmed()
+    );
+    for (label, value) in items {
+        println!(
+            "{} {:30} {} {:>8} {}",
+            "│".dimmed(),
+            label,
+            "│".dimmed(),
+            value.to_string().cyan(),
+            "│".dimmed()
+        );
+    }
+    println!(
+        "{}",
+        "└────────────────────────────────┴──────────┘".dimmed()
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -238,7 +402,11 @@ pub fn format_percent(value: f64) -> ColoredString {
 }
 
 /// Formatea un conteo con color según umbral.
-pub fn format_count(value: usize, warning_threshold: usize, error_threshold: usize) -> ColoredString {
+pub fn format_count(
+    value: usize,
+    warning_threshold: usize,
+    error_threshold: usize,
+) -> ColoredString {
     let text = value.to_string();
     if value >= error_threshold {
         text.red().bold()

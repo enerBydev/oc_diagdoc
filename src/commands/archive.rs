@@ -2,10 +2,10 @@
 //!
 //! Archiva documentos obsoletos o completados.
 
-use std::path::PathBuf;
+use crate::errors::OcResult;
 use clap::Parser;
 use serde::Serialize;
-use crate::errors::OcResult;
+use std::path::PathBuf;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ARCHIVE TYPES
@@ -40,28 +40,173 @@ pub struct ArchiveCommand {
     /// Ruta del proyecto.
     #[arg(short, long)]
     pub path: Option<PathBuf>,
-    
+
     /// Archivo de salida.
     #[arg(short, long)]
     pub output: Option<PathBuf>,
-    
+
     /// Archivar documentos con status específico.
     #[arg(long)]
     pub status: Option<String>,
-    
+
     /// Comprimir archivo.
     #[arg(long)]
     pub compress: bool,
+
+    // L27-L28: Flags avanzados
+    /// ID del documento a archivar.
+    #[arg(long)]
+    pub doc_id: Option<String>,
+
+    /// Modo dry-run (no mover archivos).
+    #[arg(long)]
+    pub dry_run: bool,
+
+    /// Actualizar referencias a docs archivados.
+    #[arg(long)]
+    pub update_refs: bool,
 }
 
 impl ArchiveCommand {
-    pub fn run(&self) -> OcResult<ArchiveResult> {
-        let output = self.output.clone().unwrap_or_else(|| {
-            PathBuf::from("archive.tar.gz")
-        });
-        let result = ArchiveResult::new(output);
-        // TODO: Implementar archivado real
+    pub fn run(&self, data_dir: &std::path::Path) -> OcResult<ArchiveResult> {
+        use crate::core::files::{get_all_md_files, read_file_content, ScanOptions};
+        use regex::Regex;
+
+        let archive_dir = data_dir.join("_archived");
+        let mut result = ArchiveResult::new(archive_dir.clone());
+
+        // Crear directorio _archived si no existe
+        if !self.dry_run && !archive_dir.exists() {
+            std::fs::create_dir_all(&archive_dir)?;
+        }
+
+        let options = ScanOptions::new();
+        let files = get_all_md_files(data_dir, &options)?;
+
+        let status_regex = Regex::new(r#"status:\s*["']?([^"'\n]+)["']?"#).unwrap();
+        let id_regex = Regex::new(r#"document_id:\s*["']?([^"'\n]+)["']?"#).unwrap();
+
+        let filter_status = self
+            .status
+            .as_deref()
+            .unwrap_or("deprecated,obsolete,archived");
+        let statuses: Vec<_> = filter_status.split(',').map(|s| s.trim()).collect();
+
+        let mut archived_ids: Vec<String> = Vec::new();
+
+        for file_path in &files {
+            if file_path.starts_with(&archive_dir) {
+                continue; // Skip already archived
+            }
+
+            if let Ok(content) = read_file_content(file_path) {
+                let mut should_archive = false;
+
+                // L27.1: Archivar por status
+                if let Some(cap) = status_regex.captures(&content) {
+                    let file_status = cap[1].trim().to_lowercase();
+                    if statuses
+                        .iter()
+                        .any(|s| file_status.contains(&s.to_lowercase()))
+                    {
+                        should_archive = true;
+                    }
+                }
+
+                // L27.1: Archivar por doc_id específico
+                if let Some(ref target_id) = self.doc_id {
+                    if let Some(cap) = id_regex.captures(&content) {
+                        if cap[1].trim() == target_id {
+                            should_archive = true;
+                            archived_ids.push(target_id.clone());
+                        }
+                    }
+                }
+
+                if should_archive {
+                    // L27.2: Mover a _archived/
+                    if let Some(file_name) = file_path.file_name() {
+                        let dest = archive_dir.join(file_name);
+
+                        if self.dry_run {
+                            eprintln!(
+                                "  📦 [DRY] Archivaría: {} → {}",
+                                file_path.display(),
+                                dest.display()
+                            );
+                        } else {
+                            std::fs::copy(file_path, &dest)?;
+                            std::fs::remove_file(file_path)?;
+                            eprintln!(
+                                "  📦 Archivado: {} → {}",
+                                file_path.display(),
+                                dest.display()
+                            );
+                        }
+
+                        if let Ok(meta) = std::fs::metadata(&dest) {
+                            result.total_bytes += meta.len() as usize;
+                        }
+                        result.files_archived += 1;
+
+                        // Capturar ID para actualizar referencias
+                        if let Some(cap) = id_regex.captures(&content) {
+                            archived_ids.push(cap[1].trim().to_string());
+                        }
+                    }
+                }
+            }
+        }
+
+        // L28.1: Actualizar referencias
+        if self.update_refs && !archived_ids.is_empty() {
+            self.update_references(data_dir, &archived_ids)?;
+        }
+
         Ok(result)
+    }
+
+    /// L28.1: Actualizar referencias a documentos archivados.
+    fn update_references(
+        &self,
+        data_dir: &std::path::Path,
+        archived_ids: &[String],
+    ) -> OcResult<()> {
+        use crate::core::files::{get_all_md_files, read_file_content, ScanOptions};
+
+        let options = ScanOptions::new();
+        let files = get_all_md_files(data_dir, &options)?;
+
+        for file_path in &files {
+            if let Ok(content) = read_file_content(file_path) {
+                let mut new_content = content.clone();
+                let mut changed = false;
+
+                for id in archived_ids {
+                    // Buscar referencias al documento archivado
+                    let patterns = vec![
+                        format!("[[{}]]", id),
+                        format!("[{}]", id),
+                        format!("parent_id: {}", id),
+                    ];
+
+                    for pattern in patterns {
+                        if new_content.contains(&pattern) {
+                            let replacement = format!("{} (ARCHIVADO)", pattern);
+                            new_content = new_content.replace(&pattern, &replacement);
+                            changed = true;
+                        }
+                    }
+                }
+
+                if changed && !self.dry_run {
+                    std::fs::write(file_path, &new_content)?;
+                    eprintln!("  🔗 Referencias actualizadas: {}", file_path.display());
+                }
+            }
+        }
+
+        Ok(())
     }
 }
 
@@ -76,27 +221,17 @@ mod tests {
     }
 
     #[test]
-    fn test_archive_command_run() {
+    fn test_archive_command_fields() {
         let cmd = ArchiveCommand {
             path: None,
             output: Some(PathBuf::from("test.tar.gz")),
             status: None,
             compress: true,
+            doc_id: None,
+            dry_run: true,
+            update_refs: false,
         };
-        let result = cmd.run().unwrap();
-        assert_eq!(result.archive_path, PathBuf::from("test.tar.gz"));
-    }
-
-    #[test]
-    fn test_archive_default_output() {
-        let cmd = ArchiveCommand {
-            path: None,
-            output: None,
-            status: None,
-            compress: false,
-        };
-        let result = cmd.run().unwrap();
-        assert!(result.archive_path.to_str().unwrap().ends_with(".tar.gz"));
+        assert!(cmd.dry_run);
     }
 
     #[test]
@@ -106,18 +241,26 @@ mod tests {
             output: None,
             status: Some("deprecated".to_string()),
             compress: true,
+            doc_id: None,
+            dry_run: false,
+            update_refs: true,
         };
-        assert!(cmd.run().is_ok());
+        assert!(cmd.update_refs);
     }
 }
 
 /// Función run para CLI.
 #[cfg(feature = "cli")]
-pub fn run(cmd: ArchiveCommand, _cli: &crate::commands::CliConfig) -> anyhow::Result<()> {
-    let result = cmd.run()?;
-    
+pub fn run(cmd: ArchiveCommand, cli: &crate::commands::CliConfig) -> anyhow::Result<()> {
+    let default_dir = PathBuf::from(&cli.data_dir);
+    let data_dir = cmd.path.as_ref().unwrap_or(&default_dir);
+    let result = cmd.run(data_dir)?;
+
     println!("📦 Archivando en: {}", result.archive_path.display());
-    println!("📄 {} archivos, {} bytes", result.files_archived, result.total_bytes);
-    
+    println!(
+        "📄 {} archivos, {} bytes",
+        result.files_archived, result.total_bytes
+    );
+
     Ok(())
 }

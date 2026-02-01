@@ -2,10 +2,10 @@
 //!
 //! Migra proyectos entre versiones de oc_diagdoc.
 
-use std::path::PathBuf;
+use crate::errors::OcResult;
 use clap::Parser;
 use serde::Serialize;
-use crate::errors::OcResult;
+use std::path::PathBuf;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // MIGRATE TYPES
@@ -29,7 +29,7 @@ impl MigrateResult {
             files_modified: 0,
         }
     }
-    
+
     pub fn add_migration(&mut self, name: &str) {
         self.migrations_applied.push(name.to_string());
     }
@@ -46,11 +46,11 @@ pub struct MigrateCommand {
     /// Ruta del proyecto.
     #[arg(short, long)]
     pub path: Option<PathBuf>,
-    
+
     /// Versión destino.
     #[arg(short, long)]
     pub to: Option<String>,
-    
+
     /// Modo dry-run.
     #[arg(long)]
     pub dry_run: bool,
@@ -60,12 +60,12 @@ impl MigrateCommand {
     pub fn run(&self) -> OcResult<MigrateResult> {
         let to_version = self.to.as_deref().unwrap_or("3.0");
         let mut result = MigrateResult::new("2.0", to_version);
-        
+
         // Migraciones de ejemplo
         result.add_migration("update_frontmatter_schema");
         result.add_migration("rename_status_field");
         result.files_modified = 10;
-        
+
         Ok(result)
     }
 }
@@ -114,12 +114,15 @@ mod tests {
 #[cfg(feature = "cli")]
 pub fn run(cmd: MigrateCommand, _cli: &crate::commands::CliConfig) -> anyhow::Result<()> {
     let result = cmd.run()?;
-    
-    println!("🔄 Migrando {} → {}", result.from_version, result.to_version);
+
+    println!(
+        "🔄 Migrando {} → {}",
+        result.from_version, result.to_version
+    );
     for m in &result.migrations_applied {
         println!("  ✓ {}", m);
     }
     println!("📊 {} archivos modificados", result.files_modified);
-    
+
     Ok(())
 }

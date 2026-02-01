@@ -5,11 +5,11 @@
 //! - Variables de entorno `OC_*`
 //! - Argumentos de línea de comandos
 
-use std::path::{Path, PathBuf};
-use std::fs;
-use std::env;
-use serde::{Deserialize, Serialize};
 use crate::errors::{OcError, OcResult};
+use serde::{Deserialize, Serialize};
+use std::env;
+use std::fs;
+use std::path::{Path, PathBuf};
 
 /// Nombre del directorio de configuración.
 pub const CONFIG_DIR: &str = ".oc_diagdoc";
@@ -69,7 +69,7 @@ impl OcConfig {
             path: path.to_path_buf(),
             source: e,
         })?;
-        
+
         serde_yaml::from_str(&content).map_err(|e| OcError::YamlParse {
             path: path.to_path_buf(),
             message: e.to_string(),
@@ -79,7 +79,7 @@ impl OcConfig {
     /// Carga configuración desde directorio de trabajo.
     pub fn from_cwd() -> OcResult<Self> {
         let config_path = Path::new(CONFIG_DIR).join(CONFIG_FILE);
-        
+
         if config_path.exists() {
             Self::from_file(&config_path)
         } else {
@@ -90,7 +90,7 @@ impl OcConfig {
     /// Carga configuración desde variables de entorno.
     pub fn from_env() -> Self {
         let mut config = Self::default();
-        
+
         if let Ok(val) = env::var("OC_DATA_DIR") {
             config.data_dir = PathBuf::from(val);
         }
@@ -112,7 +112,7 @@ impl OcConfig {
         if let Ok(val) = env::var("OC_MIN_WORDS") {
             config.coverage.min_words = val.parse().unwrap_or(300);
         }
-        
+
         config
     }
 
@@ -141,7 +141,7 @@ impl OcConfig {
         if !self.data_dir.exists() {
             return Err(OcError::DirectoryNotFound(self.data_dir.clone()));
         }
-        
+
         // Crear output_dir si no existe
         if !self.output_dir.exists() {
             fs::create_dir_all(&self.output_dir).map_err(|e| OcError::FileWrite {
@@ -149,7 +149,7 @@ impl OcConfig {
                 source: e,
             })?;
         }
-        
+
         // Crear cache_dir si cache está habilitado
         if self.cache_enabled && !self.cache_dir.exists() {
             fs::create_dir_all(&self.cache_dir).map_err(|e| OcError::FileWrite {
@@ -157,14 +157,14 @@ impl OcConfig {
                 source: e,
             })?;
         }
-        
+
         Ok(())
     }
 
     /// Guarda configuración a archivo.
     pub fn save(&self, path: impl AsRef<Path>) -> OcResult<()> {
         let path = path.as_ref();
-        
+
         // Crear directorio padre si no existe
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent).map_err(|e| OcError::FileWrite {
@@ -172,9 +172,9 @@ impl OcConfig {
                 source: e,
             })?;
         }
-        
+
         let yaml = serde_yaml::to_string(self).map_err(|e| OcError::Custom(e.to_string()))?;
-        
+
         fs::write(path, yaml).map_err(|e| OcError::FileWrite {
             path: path.to_path_buf(),
             source: e,
@@ -325,7 +325,7 @@ mod tests {
             .verbose(true)
             .threads(4)
             .build();
-        
+
         assert_eq!(config.data_dir, PathBuf::from("MisDatos"));
         assert!(config.verbose);
         assert_eq!(config.threads, 4);
@@ -335,14 +335,14 @@ mod tests {
     fn test_save_and_load() {
         let dir = tempdir().unwrap();
         let config_path = dir.path().join("config.yaml");
-        
+
         let config = OcConfig::builder()
             .data_dir("TestDatos")
             .verbose(true)
             .build();
-        
+
         config.save(&config_path).unwrap();
-        
+
         let loaded = OcConfig::from_file(&config_path).unwrap();
         assert_eq!(loaded.data_dir, PathBuf::from("TestDatos"));
         assert!(loaded.verbose);

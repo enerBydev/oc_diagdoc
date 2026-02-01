@@ -2,8 +2,8 @@
 //!
 //! Muestra ayuda detallada y ejemplos de uso.
 
-use clap::Parser;
 use crate::errors::OcResult;
+use clap::Parser;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // HELP TYPES
@@ -39,7 +39,7 @@ impl HelpResult {
             sections: Vec::new(),
         }
     }
-    
+
     pub fn add_section(&mut self, section: HelpSection) {
         self.sections.push(section);
     }
@@ -55,7 +55,7 @@ impl HelpResult {
 pub struct HelpCommand {
     /// Tema de ayuda.
     pub topic: Option<String>,
-    
+
     /// Listar todos los temas.
     #[arg(short, long)]
     pub list: bool,
@@ -65,23 +65,20 @@ impl HelpCommand {
     pub fn run(&self) -> OcResult<HelpResult> {
         let topic = self.topic.as_deref().unwrap_or("general");
         let mut result = HelpResult::new(topic);
-        
+
         result.add_section(HelpSection::new(
             "Descripción",
             "oc_diagdoc - Sistema de diagnóstico de documentación",
         ));
-        result.add_section(HelpSection::new(
-            "Uso",
-            "oc_diagdoc <comando> [opciones]",
-        ));
-        
+        result.add_section(HelpSection::new("Uso", "oc_diagdoc <comando> [opciones]"));
+
         Ok(result)
     }
-    
+
     pub fn available_topics() -> Vec<&'static str> {
         vec![
-            "general", "verify", "stats", "search", "deps", "tree",
-            "lint", "health", "coverage", "export", "compress",
+            "general", "verify", "stats", "search", "deps", "tree", "lint", "health", "coverage",
+            "export", "compress",
         ]
     }
 }
@@ -135,6 +132,6 @@ pub fn run(cmd: HelpCommand, _cli: &crate::commands::CliConfig) -> anyhow::Resul
             println!("## {}\n{}\n", section.title, section.content);
         }
     }
-    
+
     Ok(())
 }

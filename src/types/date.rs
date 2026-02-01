@@ -1,9 +1,9 @@
 //! Wrapper para fechas con parsing flexible.
 
+use crate::errors::OcError;
 use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::str::FromStr;
-use crate::errors::OcError;
 
 /// Fecha con parsing flexible.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -39,7 +39,7 @@ impl OcDate {
     pub fn days_ago(&self) -> i64 {
         (Utc::now() - self.0).num_days()
     }
-    
+
     /// ¿Es hoy?
     pub fn is_today(&self) -> bool {
         self.0.date_naive() == Utc::now().date_naive()
@@ -60,7 +60,7 @@ impl FromStr for OcDate {
         if let Ok(dt) = DateTime::parse_from_rfc3339(s) {
             return Ok(Self(dt.with_timezone(&Utc)));
         }
-        
+
         if let Ok(dt) = NaiveDate::parse_from_str(s, "%Y-%m-%d") {
             let dt = dt.and_hms_opt(0, 0, 0).unwrap();
             return Ok(Self(DateTime::from_naive_utc_and_offset(dt, Utc)));
@@ -91,7 +91,7 @@ impl std::fmt::Display for OcDate {
 
 impl std::ops::Deref for OcDate {
     type Target = DateTime<Utc>;
-    
+
     fn deref(&self) -> &Self::Target {
         &self.0
     }
@@ -100,7 +100,7 @@ impl std::ops::Deref for OcDate {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_date_parsing() {
         let d: OcDate = "2026-01-30".parse().unwrap();

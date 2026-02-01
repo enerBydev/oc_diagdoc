@@ -30,26 +30,25 @@ pub enum OutputFormat {
 pub trait Renderable: Serialize {
     /// Renderiza en formato tabla (para terminal).
     fn render_table(&self) -> String;
-    
+
     /// Renderiza como JSON.
     fn render_json(&self) -> String {
-        serde_json::to_string_pretty(self)
-            .unwrap_or_else(|_| "{}".to_string())
+        serde_json::to_string_pretty(self).unwrap_or_else(|_| "{}".to_string())
     }
-    
+
     /// Renderiza como Markdown.
     fn render_markdown(&self) -> String;
-    
+
     /// Renderiza como CSV.
     fn render_csv(&self) -> String {
         String::new() // Default vacío
     }
-    
+
     /// Renderiza como texto plano.
     fn render_plain(&self) -> String {
         self.render_table()
     }
-    
+
     /// Renderiza en el formato especificado.
     fn render(&self, format: OutputFormat) -> String {
         match format {

@@ -2,9 +2,9 @@
 //!
 //! Agrupa documentos por módulo jerárquico.
 
-use std::collections::HashMap;
-use crate::types::DocumentId;
 use crate::data::document::Document;
+use crate::types::DocumentId;
+use std::collections::HashMap;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // MODULE STATS
@@ -36,7 +36,7 @@ impl ModuleStats {
             0.0
         };
         let max_depth = docs.iter().map(|d| d.depth()).max().unwrap_or(0);
-        
+
         Self {
             doc_count,
             word_count,
@@ -76,17 +76,17 @@ impl Module {
             stats: ModuleStats::default(),
         }
     }
-    
+
     /// Número de documentos.
     pub fn doc_count(&self) -> usize {
         self.doc_ids.len()
     }
-    
+
     /// ¿Está vacío?
     pub fn is_empty(&self) -> bool {
         self.doc_ids.is_empty()
     }
-    
+
     /// Cobertura del módulo.
     pub fn coverage(&self) -> f64 {
         self.stats.coverage
@@ -107,11 +107,11 @@ impl ModuleRegistry {
     pub fn new() -> Self {
         Self::default()
     }
-    
+
     /// Construye desde documentos.
     pub fn from_documents(docs: &[Document]) -> Self {
         let mut registry = Self::new();
-        
+
         // Agrupar documentos por módulo
         let mut by_module: HashMap<u32, Vec<&Document>> = HashMap::new();
         for doc in docs {
@@ -119,66 +119,65 @@ impl ModuleRegistry {
                 by_module.entry(module).or_default().push(doc);
             }
         }
-        
+
         // Crear módulos
         for (id, module_docs) in by_module {
             let name = format!("Módulo {}", id);
             let mut module = Module::new(id, name);
-            
-            module.doc_ids = module_docs.iter()
-                .filter_map(|d| d.id().ok())
-                .collect();
-            
+
+            module.doc_ids = module_docs.iter().filter_map(|d| d.id().ok()).collect();
+
             // Encontrar documento raíz
-            module.root_doc = module_docs.iter()
+            module.root_doc = module_docs
+                .iter()
                 .filter_map(|d| d.id().ok())
                 .find(|id| id.depth() == 1);
-            
+
             module.stats = ModuleStats::compute(&module_docs);
-            
+
             registry.modules.insert(id, module);
         }
-        
+
         registry
     }
-    
+
     /// Obtiene un módulo.
     pub fn get(&self, id: u32) -> Option<&Module> {
         self.modules.get(&id)
     }
-    
+
     /// Número de módulos.
     pub fn len(&self) -> usize {
         self.modules.len()
     }
-    
+
     /// ¿Está vacío?
     pub fn is_empty(&self) -> bool {
         self.modules.is_empty()
     }
-    
+
     /// Iterador sobre módulos.
     pub fn iter(&self) -> impl Iterator<Item = (&u32, &Module)> {
         self.modules.iter()
     }
-    
+
     /// Módulos ordenados por ID.
     pub fn sorted(&self) -> Vec<&Module> {
         let mut modules: Vec<&Module> = self.modules.values().collect();
         modules.sort_by_key(|m| m.id);
         modules
     }
-    
+
     /// Total de documentos.
     pub fn total_docs(&self) -> usize {
         self.modules.values().map(|m| m.doc_count()).sum()
     }
-    
+
     /// Total de palabras.
     pub fn total_words(&self) -> usize {
         self.modules.values().map(|m| m.stats.word_count).sum()
     }
-    
+
     /// Cobertura promedio.
     pub fn average_coverage(&self) -> f64 {
         if self.modules.is_empty() {
@@ -219,7 +218,7 @@ mod tests {
         registry.modules.insert(3, Module::new(3, "Module 3"));
         registry.modules.insert(1, Module::new(1, "Module 1"));
         registry.modules.insert(2, Module::new(2, "Module 2"));
-        
+
         let sorted = registry.sorted();
         assert_eq!(sorted[0].id, 1);
         assert_eq!(sorted[1].id, 2);

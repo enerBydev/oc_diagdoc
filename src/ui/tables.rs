@@ -5,8 +5,8 @@
 //! - Estilos predefinidos OnlyCar
 //! - Funciones de creación y formateo
 
-use comfy_table::{Table, ContentArrangement, presets, modifiers};
-use crate::ui::theme::{format_status, format_percent, format_count};
+use crate::ui::theme::{format_percent, format_status};
+use comfy_table::{modifiers, presets, ContentArrangement, Table};
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ESTILOS PREDEFINIDOS
@@ -36,17 +36,17 @@ pub fn create_table<S: AsRef<str>>(headers: &[S]) -> Table {
     table.set_content_arrangement(ContentArrangement::Dynamic);
     table.load_preset(presets::UTF8_FULL);
     table.apply_modifier(modifiers::UTF8_ROUND_CORNERS);
-    
+
     let headers: Vec<&str> = headers.iter().map(|s| s.as_ref()).collect();
     table.set_header(headers);
-    
+
     table
 }
 
 /// Crea tabla con estilo específico.
 pub fn create_styled_table<S: AsRef<str>>(headers: &[S], style: TableStyle) -> Table {
     let mut table = create_table(headers);
-    
+
     match style {
         TableStyle::Full => {
             table.load_preset(presets::UTF8_FULL);
@@ -61,7 +61,7 @@ pub fn create_styled_table<S: AsRef<str>>(headers: &[S], style: TableStyle) -> T
             table.load_preset(presets::NOTHING);
         }
     }
-    
+
     table
 }
 
@@ -116,10 +116,7 @@ pub fn create_diagnostic_table() -> Table {
 
 /// Crea tabla de estadísticas.
 pub fn create_stats_table() -> Table {
-    create_styled_table(
-        &["Métrica", "Valor", "Descripción"],
-        TableStyle::Minimal,
-    )
+    create_styled_table(&["Métrica", "Valor", "Descripción"], TableStyle::Minimal)
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

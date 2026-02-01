@@ -1,7 +1,7 @@
 //! Hash de contenido para detección de cambios.
 
 use serde::{Deserialize, Serialize};
-use sha2::{Sha256, Digest};
+use sha2::{Digest, Sha256};
 
 /// Hash SHA256 del contenido (primeros 16 chars).
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
@@ -25,7 +25,7 @@ impl ContentHash {
     pub fn empty() -> Self {
         Self(String::new())
     }
-    
+
     /// Hash desde bytes.
     pub fn from_bytes(bytes: &[u8]) -> Self {
         let mut hasher = Sha256::new();
@@ -33,7 +33,7 @@ impl ContentHash {
         let result = hasher.finalize();
         Self(hex::encode(result))
     }
-    
+
     /// Versión corta (primeros 8 chars).
     pub fn short(&self) -> &str {
         if self.0.len() >= 8 {
@@ -42,12 +42,12 @@ impl ContentHash {
             &self.0
         }
     }
-    
+
     /// Hash completo.
     pub fn full(&self) -> &str {
         &self.0
     }
-    
+
     /// ¿Está vacío?
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
@@ -62,7 +62,7 @@ impl std::fmt::Display for ContentHash {
 
 impl std::ops::Deref for ContentHash {
     type Target = str;
-    
+
     fn deref(&self) -> &Self::Target {
         &self.0
     }
@@ -77,14 +77,14 @@ impl AsRef<str> for ContentHash {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_hash_compute() {
         let h = ContentHash::compute("hello world");
         assert_eq!(h.short().len(), 8);
         assert_eq!(h.full().len(), 64);
     }
-    
+
     #[test]
     fn test_hash_consistency() {
         let h1 = ContentHash::compute("test");

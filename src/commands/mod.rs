@@ -1,49 +1,49 @@
 //! Módulo de comandos CLI.
 
+use crate::CliConfig;
 #[cfg(feature = "cli")]
 use clap::Subcommand;
-use crate::CliConfig;
 
 // Comandos analíticos
-pub mod verify;
-pub mod stats;
-pub mod search;
 pub mod deps;
+pub mod search;
+pub mod stats;
 pub mod tree;
+pub mod verify;
 
 // Comandos de modificación
 pub mod batch;
-pub mod sync;
 pub mod links;
+pub mod sync;
 
 // Comandos de diagnóstico
-pub mod lint;
-pub mod health;
-pub mod coverage;
-pub mod trace;
 pub mod audit;
-pub mod report;
+pub mod coverage;
+pub mod health;
+pub mod lint;
 pub mod module;
+pub mod report;
+pub mod trace;
 pub mod watch;
 
 // Comandos de generación
+pub mod compress;
+pub mod export;
 pub mod gen;
 pub mod template;
-pub mod export;
-pub mod compress;
 
 // Comandos de producción
-pub mod init;
-pub mod migrate;
-pub mod diff;
-pub mod snapshot;
-pub mod restore;
 pub mod archive;
 pub mod ci;
+pub mod diff;
+pub mod init;
+pub mod migrate;
+pub mod restore;
+pub mod snapshot;
 
 // Comandos de sistema
-pub mod readme;
 pub mod help;
+pub mod readme;
 
 #[cfg(feature = "cli")]
 #[derive(Subcommand, Debug)]
@@ -54,12 +54,12 @@ pub enum Command {
     Search(search::SearchCommand),
     Deps(deps::DepsCommand),
     Tree(tree::TreeCommand),
-    
+
     // Modificación
     Batch(batch::BatchCommand),
     Sync(sync::SyncCommand),
     Links(links::LinksCommand),
-    
+
     // Diagnóstico
     Lint(lint::LintCommand),
     Health(health::HealthCommand),
@@ -69,13 +69,13 @@ pub enum Command {
     Report(report::ReportCommand),
     Module(module::ModuleCommand),
     Watch(watch::WatchCommand),
-    
+
     // Generación
     Gen(gen::GenCommand),
     Template(template::TemplateCommand),
     Export(export::ExportCommand),
     Compress(compress::CompressCommand),
-    
+
     // Producción
     Init(init::InitCommand),
     Migrate(migrate::MigrateCommand),
@@ -84,7 +84,7 @@ pub enum Command {
     Restore(restore::RestoreCommand),
     Archive(archive::ArchiveCommand),
     Ci(ci::CiCommand),
-    
+
     // Sistema
     Readme(readme::ReadmeCommand),
     Help(help::HelpCommand),
@@ -124,4 +124,3 @@ pub fn execute(cmd: Command, cli: &CliConfig) -> anyhow::Result<()> {
         Command::Help(args) => help::run(args, cli),
     }
 }
-

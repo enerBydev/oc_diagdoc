@@ -2,10 +2,10 @@
 //!
 //! Rastrea referencias y dependencias de un documento.
 
-use std::path::PathBuf;
-use std::collections::HashSet;
-use clap::Parser;
 use crate::errors::OcResult;
+use clap::Parser;
+use std::collections::HashSet;
+use std::path::PathBuf;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TRACE TYPES
@@ -46,14 +46,14 @@ impl TraceResult {
             depth_reached: 0,
         }
     }
-    
+
     pub fn add_reference(&mut self, reference: TraceReference) {
         if reference.depth > self.depth_reached {
             self.depth_reached = reference.depth;
         }
         self.references.push(reference);
     }
-    
+
     pub fn unique_documents(&self) -> HashSet<&str> {
         let mut docs = HashSet::new();
         docs.insert(self.document_id.as_str());
@@ -63,9 +63,54 @@ impl TraceResult {
         }
         docs
     }
-    
+
     pub fn by_type(&self, ref_type: TraceType) -> Vec<&TraceReference> {
-        self.references.iter().filter(|r| r.ref_type == ref_type).collect()
+        self.references
+            .iter()
+            .filter(|r| r.ref_type == ref_type)
+            .collect()
+    }
+
+    // L8: Métodos avanzados
+
+    /// L8.1: Calcula impacto (cuántos documentos se afectarían si éste cambia).
+    pub fn impact_count(&self) -> usize {
+        self.unique_documents().len() - 1 // Excluir el documento origen
+    }
+
+    /// L8.2: Lista docs por nivel de cercanía.
+    pub fn docs_by_depth(&self) -> std::collections::HashMap<usize, Vec<&str>> {
+        let mut by_depth: std::collections::HashMap<usize, Vec<&str>> =
+            std::collections::HashMap::new();
+        for r in &self.references {
+            by_depth.entry(r.depth).or_default().push(&r.target);
+        }
+        by_depth
+    }
+
+    /// L8.4: Genera output en formato Mermaid graph.
+    pub fn render_mermaid(&self) -> String {
+        let mut output = String::from("graph TD\n");
+        let mut seen = std::collections::HashSet::new();
+
+        for r in &self.references {
+            let edge_key = format!("{}-->{}", r.source, r.target);
+            if seen.contains(&edge_key) {
+                continue;
+            }
+            seen.insert(edge_key);
+
+            let arrow = match r.ref_type {
+                TraceType::Parent => "-->|parent|",
+                TraceType::Child => "-->|child|",
+                TraceType::Link => "-.->|link|",
+                TraceType::Embed => "==>|embed|",
+                TraceType::Backlink => "<-.->|backlink|",
+            };
+            output.push_str(&format!("    {}{}{}\n", r.source, arrow, r.target));
+        }
+
+        output
     }
 }
 
@@ -79,18 +124,27 @@ impl TraceResult {
 pub struct TraceCommand {
     /// ID del documento a rastrear.
     pub document_id: String,
-    
+
     /// Ruta del proyecto.
     #[arg(short, long)]
     pub path: Option<PathBuf>,
-    
+
     /// Profundidad máxima.
     #[arg(short, long, default_value = "3")]
     pub depth: usize,
-    
+
     /// Incluir backlinks.
     #[arg(long)]
     pub backlinks: bool,
+
+    // L8: Flags avanzados
+    /// Output en formato Mermaid graph.
+    #[arg(long)]
+    pub mermaid: bool,
+
+    /// Mostrar análisis de impacto (cuántos docs afectados).
+    #[arg(long)]
+    pub impact: bool,
 }
 
 impl TraceCommand {
@@ -98,60 +152,75 @@ impl TraceCommand {
         use crate::core::files::{get_all_md_files, read_file_content, ScanOptions};
         use regex::Regex;
         use std::collections::HashMap;
-        
+
         let mut result = TraceResult::new(&self.document_id);
-        
+
         let options = ScanOptions::new();
         let files = get_all_md_files(data_dir, &options)?;
-        
+
         // Regex para parent_id y wiki links
         let parent_regex = Regex::new(r#"parent_id:\s*["']?([^"'\s\n]+)["']?"#).unwrap();
         let wiki_link = Regex::new(r"\[\[([^\]]+)\]\]").unwrap();
-        
+
         // Construir mapas de relaciones
         let mut parent_map: HashMap<String, String> = HashMap::new(); // id -> parent_id
         let mut children_map: HashMap<String, Vec<String>> = HashMap::new(); // id -> [children]
         let mut links_from: HashMap<String, Vec<String>> = HashMap::new(); // id -> [links salientes]
         let mut links_to: HashMap<String, Vec<String>> = HashMap::new(); // id -> [backlinks]
-        
+
         // Fase 1: Parsear relaciones
         for file_path in &files {
-            let file_id = file_path.file_stem()
+            let file_id = file_path
+                .file_stem()
                 .and_then(|s| s.to_str())
                 .unwrap_or("unknown")
                 .to_string();
-            
+
             if let Ok(content) = read_file_content(file_path) {
                 // Extraer parent_id
                 if let Some(cap) = parent_regex.captures(&content) {
                     let parent_id = cap[1].to_string();
                     parent_map.insert(file_id.clone(), parent_id.clone());
-                    children_map.entry(parent_id).or_default().push(file_id.clone());
+                    children_map
+                        .entry(parent_id)
+                        .or_default()
+                        .push(file_id.clone());
                 }
-                
+
                 // Extraer wiki links
                 for cap in wiki_link.captures_iter(&content) {
-                    let target = cap[1].split('/').last().unwrap_or(&cap[1])
-                        .split('|').next().unwrap_or(&cap[1]).trim().to_string();
-                    
+                    let target = cap[1]
+                        .split('/')
+                        .last()
+                        .unwrap_or(&cap[1])
+                        .split('|')
+                        .next()
+                        .unwrap_or(&cap[1])
+                        .trim()
+                        .to_string();
+
                     if target != file_id {
-                        links_from.entry(file_id.clone()).or_default().push(target.clone());
+                        links_from
+                            .entry(file_id.clone())
+                            .or_default()
+                            .push(target.clone());
                         links_to.entry(target).or_default().push(file_id.clone());
                     }
                 }
             }
         }
-        
+
         // Fase 2: Trazar ancestros (subiendo por parent_id)
         self.trace_ancestors(&self.document_id, &parent_map, 1, &mut result);
-        
+
         // Fase 3: Trazar descendientes (bajando por children)
         self.trace_descendants(&self.document_id, &children_map, 1, &mut result);
-        
+
         // Fase 4: Trazar links salientes
         if let Some(links) = links_from.get(&self.document_id) {
             for target in links {
-                if result.references.len() < 100 { // Limite
+                if result.references.len() < 100 {
+                    // Limite
                     result.add_reference(TraceReference {
                         source: self.document_id.clone(),
                         target: target.clone(),
@@ -161,12 +230,13 @@ impl TraceCommand {
                 }
             }
         }
-        
+
         // Fase 5: Trazar backlinks (quien me referencia)
         if self.backlinks {
             if let Some(backlinks) = links_to.get(&self.document_id) {
                 for source in backlinks {
-                    if result.references.len() < 100 { // Limite
+                    if result.references.len() < 100 {
+                        // Limite
                         result.add_reference(TraceReference {
                             source: source.clone(),
                             target: self.document_id.clone(),
@@ -177,10 +247,10 @@ impl TraceCommand {
                 }
             }
         }
-        
+
         Ok(result)
     }
-    
+
     /// Traza ancestros recursivamente.
     fn trace_ancestors(
         &self,
@@ -192,7 +262,7 @@ impl TraceCommand {
         if depth > self.depth {
             return;
         }
-        
+
         if let Some(parent_id) = parent_map.get(doc_id) {
             result.add_reference(TraceReference {
                 source: doc_id.to_string(),
@@ -203,7 +273,7 @@ impl TraceCommand {
             self.trace_ancestors(parent_id, parent_map, depth + 1, result);
         }
     }
-    
+
     /// Traza descendientes recursivamente.
     fn trace_descendants(
         &self,
@@ -215,7 +285,7 @@ impl TraceCommand {
         if depth > self.depth {
             return;
         }
-        
+
         if let Some(children) = children_map.get(doc_id) {
             for child_id in children {
                 result.add_reference(TraceReference {
@@ -250,7 +320,7 @@ mod tests {
             ref_type: TraceType::Link,
             depth: 1,
         });
-        
+
         assert_eq!(result.references.len(), 1);
         assert_eq!(result.depth_reached, 1);
     }
@@ -264,7 +334,7 @@ mod tests {
             ref_type: TraceType::Link,
             depth: 1,
         });
-        
+
         assert_eq!(result.unique_documents().len(), 2);
     }
 
@@ -283,7 +353,7 @@ mod tests {
             ref_type: TraceType::Parent,
             depth: 1,
         });
-        
+
         assert_eq!(result.by_type(TraceType::Link).len(), 1);
         assert_eq!(result.by_type(TraceType::Parent).len(), 1);
     }
@@ -294,12 +364,12 @@ mod tests {
 pub fn run(cmd: TraceCommand, cli: &crate::CliConfig) -> anyhow::Result<()> {
     let data_dir = std::path::Path::new(&cli.data_dir);
     let result = cmd.run(data_dir)?;
-    
+
     println!("🔍 Trace de: {}", result.document_id);
     println!("📊 {} referencias encontradas", result.references.len());
     println!("📈 Profundidad: {}", result.depth_reached);
     println!("📄 {} documentos únicos", result.unique_documents().len());
-    
+
     for r in &result.references {
         let icon = match r.ref_type {
             TraceType::Link => "🔗",
@@ -310,6 +380,6 @@ pub fn run(cmd: TraceCommand, cli: &crate::CliConfig) -> anyhow::Result<()> {
         };
         println!("  {} {} → {}", icon, r.source, r.target);
     }
-    
+
     Ok(())
 }
