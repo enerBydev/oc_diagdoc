@@ -13,7 +13,7 @@
 If you discover a security vulnerability, please report it by:
 
 1. **DO NOT** open a public issue
-2. Email: security@enerbydev.com
+2. Email: security@enerby.dev
 3. Include details and reproduction steps
 
 We will respond within 48 hours.

@@ -117,7 +117,25 @@ pub struct ExportCommand {
     /// Exportar todo en un único archivo concatenado.
     #[arg(long)]
     pub single_file: bool,
+
+    // P2: Nuevas flags de paridad con Python v16 (IA context exporter)
+    /// Límite máximo de tokens para exportación (estimado ~4 chars/token).
+    #[arg(long)]
+    pub max_tokens: Option<usize>,
+
+    /// Modo compacto: minimiza whitespace y remove duplicados.
+    #[arg(long)]
+    pub compact: bool,
+
+    /// Incluir árbol de estructura antes del contenido.
+    #[arg(long)]
+    pub tree: bool,
+
+    /// Incluir estadísticas del proyecto en el export.
+    #[arg(long)]
+    pub stats: bool,
 }
+
 
 /// L11.3: Índice de exportación.
 #[derive(Debug, Clone, Serialize)]
@@ -141,7 +159,7 @@ pub struct ExportFileEntry {
 impl ExportCommand {
     pub fn run(&self, data_dir: &std::path::Path) -> OcResult<ExportResult> {
         use crate::core::files::{get_all_md_files, read_file_content, ScanOptions};
-        use regex::Regex;
+        
         use std::collections::HashSet;
 
         let output_dir = self
@@ -156,8 +174,9 @@ impl ExportCommand {
         let options = ScanOptions::new();
         let files = get_all_md_files(data_dir, &options)?;
 
-        let module_regex = Regex::new(r#"module:\s*["']?([^"'\n]+)["']?"#).unwrap();
-        let title_regex = Regex::new(r#"title:\s*["']?([^"'\n]+)["']?"#).unwrap();
+        use crate::core::patterns::{RE_MODULE, RE_TITLE};
+        let module_regex = &*RE_MODULE;
+        let title_regex = &*RE_TITLE;
 
         let mut modules_found: HashSet<String> = HashSet::new();
         let mut index_entries: Vec<ExportFileEntry> = Vec::new();
@@ -346,6 +365,11 @@ mod tests {
             // F6/F9: Campos agregados
             template: None,
             single_file: false,
+            // P2: Campos agregados v16
+            max_tokens: None,
+            compact: false,
+            tree: false,
+            stats: false,
         };
         assert_eq!(cmd.format_enum(), ExportFormat::Latex);
     }

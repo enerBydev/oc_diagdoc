@@ -139,8 +139,9 @@ impl PipelineStage for LinkValidationStage {
     }
 
     fn process(&self, ctx: &mut PipelineContext) -> PipelineResult {
-        // Regex simple para links markdown
-        let link_pattern = regex::Regex::new(r"\[([^\]]+)\]\(([^)]+)\)").unwrap();
+        // Usar patrón precompilado centralizado
+        use crate::core::patterns::RE_MD_LINK;
+        let link_pattern = &*RE_MD_LINK;
 
         // Clonar content para evitar borrow conflict
         let content = ctx.content.clone();

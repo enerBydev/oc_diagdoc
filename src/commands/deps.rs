@@ -40,10 +40,20 @@ impl Cycle {
     pub fn new(nodes: Vec<String>) -> Self {
         Self { nodes }
     }
+}
 
-    pub fn to_string(&self) -> String {
-        self.nodes.join(" → ") + " → " + &self.nodes[0]
+impl std::fmt::Display for Cycle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} → {}", self.nodes.join(" → "), &self.nodes[0])
     }
+}
+
+/// P1-A2: Detalles de un documento huérfano.
+#[derive(Debug, Clone)]
+pub struct OrphanDetails {
+    pub id: String,
+    pub invalid_parent: Option<String>,  // El parent que no existe o es inválido
+    pub reason: String,                   // "no_parent", "null_parent", "missing_parent"
 }
 
 /// Resultado del análisis de dependencias.
@@ -53,6 +63,7 @@ pub struct DepsResult {
     pub cycles: Vec<Cycle>,
     pub root_nodes: Vec<String>,
     pub leaf_nodes: Vec<String>,
+    pub orphan_nodes: Vec<OrphanDetails>,  // P1-A2: Detalles de huérfanos
 }
 
 impl DepsResult {
@@ -62,6 +73,7 @@ impl DepsResult {
             cycles: Vec::new(),
             root_nodes: Vec::new(),
             leaf_nodes: Vec::new(),
+            orphan_nodes: Vec::new(),
         }
     }
 
@@ -138,13 +150,27 @@ pub struct DepsCommand {
     /// Mostrar solo documentos huérfanos (sin parent).
     #[arg(long)]
     pub orphans: bool,
+
+    // P1: Nuevas flags de paridad con Python v16
+    /// Generar grafo en formato DOT (Graphviz).
+    #[arg(long)]
+    pub graph: bool,
+
+    /// Formato de salida: dot, json, table
+    #[arg(long, default_value = "table")]
+    pub format: String,
+
+    /// Guardar resultado en archivo.
+    #[arg(short, long)]
+    pub output: Option<PathBuf>,
 }
+
 
 impl DepsCommand {
     /// Ejecuta el análisis.
     pub fn run(&self, data_dir: &std::path::Path) -> OcResult<DepsResult> {
         use crate::core::files::{get_all_md_files, read_file_content, ScanOptions};
-        use regex::Regex;
+        
         use std::collections::HashSet;
 
         let mut result = DepsResult::new();
@@ -153,13 +179,16 @@ impl DepsCommand {
         let files = get_all_md_files(data_dir, &options)?;
 
         // Patrones para detectar dependencias
-        let parent_regex = Regex::new(r#"parent_id:\s*["']?([^"'\s]+)["']?"#).unwrap();
-        let wiki_link = Regex::new(r"\[\[([^\]]+)\]\]").unwrap();
-        let markdown_link = Regex::new(r"\[([^\]]+)\]\(([^)]+\.md)\)").unwrap();
+        use crate::core::patterns::{RE_PARENT_ID, RE_WIKI_LINK, RE_MD_LINK_TO_MD};
+        let parent_regex = &*RE_PARENT_ID;
+        let wiki_link = &*RE_WIKI_LINK;
+        let markdown_link = &*RE_MD_LINK_TO_MD;
 
         let mut all_nodes: HashSet<String> = HashSet::new();
         let mut nodes_with_parents: HashSet<String> = HashSet::new();
         let mut nodes_with_children: HashSet<String> = HashSet::new();
+        // C3: Mapa para verificar parent existente
+        let mut parent_map: HashMap<String, String> = HashMap::new();
 
         for file_path in &files {
             // Extraer ID del archivo
@@ -174,15 +203,22 @@ impl DepsCommand {
             if let Ok(content) = read_file_content(file_path) {
                 // Buscar parent_id en frontmatter
                 if let Some(cap) = parent_regex.captures(&content) {
-                    let parent_id = &cap[1];
-                    result.dependencies.push(Dependency {
-                        from: parent_id.to_string(),
-                        to: file_id.clone(),
-                        dep_type: DependencyType::Hierarchy,
-                    });
-                    nodes_with_parents.insert(file_id.clone());
-                    nodes_with_children.insert(parent_id.to_string());
+                    let parent_id = cap[1].trim().to_string();
+                    
+                    // C3: Verificar si parent es válido
+                    if parent_id != "null" && !parent_id.is_empty() {
+                        result.dependencies.push(Dependency {
+                            from: parent_id.clone(),
+                            to: file_id.clone(),
+                            dep_type: DependencyType::Hierarchy,
+                        });
+                        nodes_with_parents.insert(file_id.clone());
+                        nodes_with_children.insert(parent_id.clone());
+                        parent_map.insert(file_id.clone(), parent_id);
+                    }
+                    // Si parent es "null" o vacío, no agregamos a nodes_with_parents
                 }
+                // Si no hay campo parent, tampoco agregamos a nodes_with_parents
 
                 // Buscar wiki links
                 for cap in wiki_link.captures_iter(&content) {
@@ -226,8 +262,30 @@ impl DepsCommand {
             }
         }
 
+        // P1-A2: Detectar huérfanos con detalles (sin parent válido O parent inexistente)
+        for node in &all_nodes {
+            if !nodes_with_parents.contains(node) {
+                // Sin parent o parent=null → huérfano
+                result.orphan_nodes.push(OrphanDetails {
+                    id: node.clone(),
+                    invalid_parent: None,
+                    reason: "no_parent".to_string(),
+                });
+            } else if let Some(parent) = parent_map.get(node) {
+                // Verificar si parent referenciado existe
+                if !all_nodes.contains(parent) {
+                    result.orphan_nodes.push(OrphanDetails {
+                        id: node.clone(),
+                        invalid_parent: Some(parent.clone()),
+                        reason: "missing_parent".to_string(),
+                    });
+                }
+            }
+        }
+
         result.root_nodes.sort();
         result.leaf_nodes.sort();
+        result.orphan_nodes.sort_by(|a, b| a.id.cmp(&b.id));
 
         if self.detect_cycles {
             self.find_cycles(&mut result);
@@ -341,33 +399,63 @@ pub fn run(cmd: DepsCommand, cli: &crate::CliConfig) -> anyhow::Result<()> {
 
     // F5: Procesar --orphans
     if cmd.orphans {
-        println!("👻 Documentos huérfanos (sin parent):");
+        println!("👻 Documentos huérfanos (sin parent válido):");
 
-        let parent_re = regex::Regex::new(r#"parent_id:\s*["']?([^"'\n]+)["']?"#).unwrap();
+        use crate::core::patterns::RE_PARENT_ID;
+        let parent_re = &*RE_PARENT_ID;
         let mut orphans_count = 0;
+        let mut missing_parent_count = 0;
 
+        // Construir set de todos los IDs válidos
+        let mut all_ids: std::collections::HashSet<String> = std::collections::HashSet::new();
         use walkdir::WalkDir;
+        for entry in WalkDir::new(data_dir).into_iter().filter_map(|e| e.ok()) {
+            let path = entry.path();
+            if path.is_file() && path.extension().map(|e| e == "md").unwrap_or(false) {
+                if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
+                    all_ids.insert(stem.to_string());
+                }
+            }
+        }
+
         for entry in WalkDir::new(data_dir).into_iter().filter_map(|e| e.ok()) {
             let path = entry.path();
             if !path.is_file() { continue; }
             if path.extension().map(|e| e != "md").unwrap_or(true) { continue; }
             if let Ok(content) = std::fs::read_to_string(&path) {
-                let has_parent = if let Some(cap) = parent_re.captures(&content) {
+                let parent_info = if let Some(cap) = parent_re.captures(&content) {
                     let parent = cap[1].trim();
-                    !parent.is_empty() && parent != "null" && parent != "~"
+                    if parent.is_empty() || parent == "null" || parent == "~" {
+                        Some(("no_parent".to_string(), None))
+                    } else if !all_ids.contains(parent) {
+                        Some(("missing_parent".to_string(), Some(parent.to_string())))
+                    } else {
+                        None // Tiene parent válido
+                    }
                 } else {
-                    false
+                    Some(("no_parent".to_string(), None))
                 };
 
-                if !has_parent {
+                if let Some((reason, invalid_parent)) = parent_info {
                     let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("?");
-                    println!("  📄 {}", name);
+                    match reason.as_str() {
+                        "missing_parent" => {
+                            println!("  📄 {} → ⚠️  parent inexistente: '{}'", name, invalid_parent.unwrap_or_default());
+                            missing_parent_count += 1;
+                        }
+                        _ => {
+                            println!("  📄 {} → sin parent definido", name);
+                        }
+                    }
                     orphans_count += 1;
                 }
             }
         }
 
         println!("\n📊 {} documentos huérfanos encontrados", orphans_count);
+        if missing_parent_count > 0 {
+            println!("   ⚠️  {} con parent inexistente", missing_parent_count);
+        }
         return Ok(());
     }
 
@@ -375,8 +463,9 @@ pub fn run(cmd: DepsCommand, cli: &crate::CliConfig) -> anyhow::Result<()> {
     if let Some(ref doc_id) = cmd.impact {
         println!("💥 Análisis de impacto para: {}", doc_id);
 
-        let parent_re = regex::Regex::new(r#"parent_id:\s*["']?([^"'\n]+)["']?"#).unwrap();
-        let link_re = regex::Regex::new(r"\[\[([^\]]+)\]\]").unwrap();
+        use crate::core::patterns::{RE_PARENT_ID, RE_WIKI_LINK};
+        let parent_re = &*RE_PARENT_ID;
+        let link_re = &*RE_WIKI_LINK;
 
         let mut referencing: Vec<String> = Vec::new();
         let mut children: Vec<String> = Vec::new();

@@ -6,6 +6,7 @@
 //! - Argumentos de línea de comandos
 
 use crate::errors::{OcError, OcResult};
+use crate::DEFAULT_DATA_DIR;
 use serde::{Deserialize, Serialize};
 use std::env;
 use std::fs;
@@ -43,7 +44,7 @@ pub struct OcConfig {
 impl Default for OcConfig {
     fn default() -> Self {
         Self {
-            data_dir: PathBuf::from("Datos"),
+            data_dir: PathBuf::from(DEFAULT_DATA_DIR),
             output_dir: PathBuf::from("./output"),
             cache_enabled: true,
             cache_dir: PathBuf::from(".oc_diagdoc/cache"),
@@ -118,7 +119,7 @@ impl OcConfig {
 
     /// Merge con otra configuración (otra tiene prioridad).
     pub fn merge(&mut self, other: Self) {
-        if other.data_dir != PathBuf::from("Datos") {
+        if other.data_dir != PathBuf::from(DEFAULT_DATA_DIR) {
             self.data_dir = other.data_dir;
         }
         if other.output_dir != PathBuf::from("./output") {

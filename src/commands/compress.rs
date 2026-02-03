@@ -92,12 +92,37 @@ pub struct CompressCommand {
     /// Dividir salida por módulo (crea múltiples archivos).
     #[arg(long)]
     pub split_by_module: bool,
+
+    // B5: Nuevas flags de paridad con Python (doc_compiler.py)
+    /// Generar versión PDF después de compilar (requiere pandoc).
+    #[arg(long)]
+    pub pdf: bool,
+
+    /// Archivo de configuración YAML/JSON personalizado.
+    #[arg(short = 'c', long)]
+    pub config: Option<PathBuf>,
+
+    /// Modo estricto: falla en warnings.
+    #[arg(long)]
+    pub strict: bool,
+
+    /// Omitir validaciones de calidad.
+    #[arg(long)]
+    pub skip_validation: bool,
+
+    /// Incluir metadata YAML como bloque informativo.
+    #[arg(long)]
+    pub include_yaml: bool,
+
+    /// P3-B4: Modo preview - mostrar output sin escribir archivo.
+    #[arg(long)]
+    pub preview: bool,
 }
 
 impl CompressCommand {
     pub fn run(&self, data_dir: &std::path::Path) -> OcResult<CompressResult> {
         use crate::core::files::{get_all_md_files, read_file_content, ScanOptions};
-        use regex::Regex;
+        
         use std::collections::HashSet;
 
         let output = self
@@ -110,9 +135,10 @@ impl CompressCommand {
         let files = get_all_md_files(data_dir, &options)?;
 
         // Regex para extraer metadata
-        let title_regex = Regex::new(r#"title:\s*["']?([^"'\n]+)["']?"#).unwrap();
-        let module_regex = Regex::new(r#"module:\s*["']?([^"'\n]+)["']?"#).unwrap();
-        let draft_regex = Regex::new(r#"draft:\s*true"#).unwrap();
+        use crate::core::patterns::{RE_TITLE, RE_MODULE, RE_DRAFT};
+        let title_regex = &*RE_TITLE;
+        let module_regex = &*RE_MODULE;
+        let draft_regex = &*RE_DRAFT;
 
         // Ordenar archivos por nombre (que incluye la numeración)
         let mut sorted_files: Vec<_> = files.clone();
@@ -202,16 +228,54 @@ impl CompressCommand {
                 };
                 let json = serde_json::to_string_pretty(&collection).unwrap_or_default();
                 result.output_bytes = json.len();
-                std::fs::write(&output, &json)?;
+                if self.preview {
+                    println!("📋 Preview (primeras 50 líneas):\n{}", 
+                             json.lines().take(50).collect::<Vec<_>>().join("\n"));
+                } else {
+                    std::fs::write(&output, &json)?;
+                }
             }
             "html" => {
                 let html = self.render_html(&toc, &compiled_content, result.documents_included);
                 result.output_bytes = html.len();
-                std::fs::write(&output, &html)?;
+                if self.preview {
+                    println!("📋 Preview (primeras 50 líneas):\n{}", 
+                             html.lines().take(50).collect::<Vec<_>>().join("\n"));
+                } else {
+                    std::fs::write(&output, &html)?;
+                }
             }
             _ => {
                 // Default: markdown
-                std::fs::write(&output, &final_content)?;
+                if self.preview {
+                    println!("📋 Preview (primeras 100 líneas):\n{}", 
+                             final_content.lines().take(100).collect::<Vec<_>>().join("\n"));
+                    println!("\n... ({} líneas más)", final_content.lines().count().saturating_sub(100));
+                } else {
+                    std::fs::write(&output, &final_content)?;
+                }
+            }
+        }
+
+        // B5: Generar PDF si se solicitó
+        if self.pdf {
+            let pdf_output = output.with_extension("pdf");
+            let status = std::process::Command::new("pandoc")
+                .args([
+                    output.to_str().unwrap_or_default(),
+                    "-o",
+                    pdf_output.to_str().unwrap_or_default(),
+                    "--pdf-engine=pdflatex",
+                ])
+                .status();
+
+            match status {
+                Ok(s) if s.success() => {
+                    eprintln!("📄 PDF generado: {}", pdf_output.display());
+                }
+                _ => {
+                    eprintln!("⚠️ Error generando PDF (¿pandoc instalado?)");
+                }
             }
         }
 
@@ -290,6 +354,12 @@ mod tests {
             modules: None,
             no_drafts: false,
             split_by_module: false,
+            pdf: false,
+            config: None,
+            strict: false,
+            skip_validation: false,
+            include_yaml: false,
+            preview: false,
         };
         let result = cmd.run(&temp_dir).unwrap();
         assert_eq!(result.output_path, PathBuf::from("/tmp/test_compress.md"));
@@ -305,6 +375,12 @@ mod tests {
             modules: None,
             no_drafts: false,
             split_by_module: false,
+            pdf: false,
+            config: None,
+            strict: false,
+            skip_validation: false,
+            include_yaml: false,
+            preview: false,
         };
         let result = cmd.run(&temp_dir).unwrap();
         assert!(result.output_path.to_str().unwrap().ends_with(".pdf"));

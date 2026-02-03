@@ -1,14 +1,46 @@
-//! Sistema de errores para oc_diagdoc.
+//! # Sistema de Errores Tipado
 //!
-//! Define todos los tipos de errores posibles en el sistema.
+//! Manejo de errores estructurado para oc_diagdoc usando `thiserror`.
+//!
+//! ## Categorías de errores
+//!
+//! | Categoría | Exit Code | Ejemplos |
+//! |-----------|-----------|----------|
+//! | Parsing | 20-29 | `InvalidId`, `YamlParse` |
+//! | Filesystem | 10-19 | `FileNotFound`, `FileRead` |
+//! | Validación | 30-39 | `BrokenLink`, `OrphanDocument` |
+//! | Comandos | 1-9 | `InvalidArgument` |
+//! | Sistema | 90-99 | `CacheError` |
+//!
+//! ## Macros de conveniencia
+//!
+//! - [`oc_err!`] - Crea `OcError::Custom` rápidamente
+//! - [`bail!`] - Retorna error con mensaje formateado
+//!
+//! ## Ejemplo
+//!
+//! ```rust,ignore
+//! use oc_diagdoc_lib::{OcResult, OcError, oc_err};
+//!
+//! fn load_file(path: &str) -> OcResult<String> {
+//!     if !std::path::Path::new(path).exists() {
+//!         return Err(OcError::FileNotFound(path.into()));
+//!     }
+//!     // ...
+//!     Ok("content".to_string())
+//! }
+//! ```
 
 use std::path::PathBuf;
 use thiserror::Error;
 
-/// Resultado estándar del sistema.
+/// Resultado estándar del sistema con [`OcError`].
 pub type OcResult<T> = Result<T, OcError>;
 
 /// Error principal del sistema.
+///
+/// Enum exhaustivo de todos los errores posibles, con exit codes
+/// categorizados para uso en CLI.
 #[derive(Error, Debug)]
 pub enum OcError {
     // ═══════════════════════════════════════════════════════════════

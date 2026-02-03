@@ -70,7 +70,7 @@ pub struct ArchiveCommand {
 impl ArchiveCommand {
     pub fn run(&self, data_dir: &std::path::Path) -> OcResult<ArchiveResult> {
         use crate::core::files::{get_all_md_files, read_file_content, ScanOptions};
-        use regex::Regex;
+        
 
         let archive_dir = data_dir.join("_archived");
         let mut result = ArchiveResult::new(archive_dir.clone());
@@ -83,8 +83,9 @@ impl ArchiveCommand {
         let options = ScanOptions::new();
         let files = get_all_md_files(data_dir, &options)?;
 
-        let status_regex = Regex::new(r#"status:\s*["']?([^"'\n]+)["']?"#).unwrap();
-        let id_regex = Regex::new(r#"document_id:\s*["']?([^"'\n]+)["']?"#).unwrap();
+        use crate::core::patterns::{RE_STATUS, RE_DOCUMENT_ID};
+        let status_regex = &*RE_STATUS;
+        let id_regex = &*RE_DOCUMENT_ID;
 
         let filter_status = self
             .status

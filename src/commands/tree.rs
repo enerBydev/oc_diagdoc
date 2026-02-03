@@ -244,13 +244,32 @@ pub struct TreeCommand {
     /// Mostrar solo nodos huérfanos.
     #[arg(long)]
     pub orphans_only: bool,
+
+    // AN-04 FIX: Root filter
+    /// ID del nodo raíz desde donde mostrar (alternativa a --module).
+    #[arg(long)]
+    pub root: Option<String>,
+
+    // P1: Nuevas flags de paridad con Python v16
+    /// Mostrar status (draft/published/review) junto a cada nodo.
+    #[arg(long)]
+    pub show_status: bool,
+
+    /// Formato de salida: ascii, json, md
+    #[arg(long, default_value = "ascii")]
+    pub format: String,
+
+    /// Guardar resultado en archivo.
+    #[arg(short, long)]
+    pub output: Option<PathBuf>,
 }
+
 
 impl TreeCommand {
     /// Ejecuta el comando.
     pub fn run(&self, data_dir: &std::path::Path) -> OcResult<TreeResult> {
         use crate::core::files::{get_all_md_files, read_file_content, ScanOptions};
-        use regex::Regex;
+        
         use std::collections::HashMap;
 
         let mut result = TreeResult::new();
@@ -259,8 +278,9 @@ impl TreeCommand {
         let files = get_all_md_files(data_dir, &options)?;
 
         // Regex para extraer parent_id y title del frontmatter
-        let parent_regex = Regex::new(r#"parent_id:\s*["']?([^"'\s\n]+)["']?"#).unwrap();
-        let title_regex = Regex::new(r#"title:\s*["']?([^"'\n]+)["']?"#).unwrap();
+        use crate::core::patterns::{RE_PARENT_ID, RE_TITLE};
+        let parent_regex = &*RE_PARENT_ID;
+        let title_regex = &*RE_TITLE;
 
         // Estructura: id -> (title, parent_id, word_count)
         let mut docs: HashMap<String, (String, Option<String>, usize)> = HashMap::new();
@@ -278,6 +298,25 @@ impl TreeCommand {
             // Filtrar por módulo si se especificó
             if let Some(ref module_filter) = self.module {
                 if !file_id.starts_with(module_filter) {
+                    continue;
+                }
+            }
+
+            // AN-04 FIX + P1-A1: Filtrar por root con matching flexible
+            if let Some(ref root_filter) = self.root {
+                // Normalizar: "1.0" debe coincidir con "1.0.", "1.0.1", "1.0 titulo", etc.
+                let normalized_filter = if root_filter.ends_with('.') {
+                    root_filter.clone()
+                } else {
+                    format!("{}.", root_filter)
+                };
+                
+                // Matching flexible: prefijo exacto O prefijo normalizado O file_id == filter
+                let matches = file_id.starts_with(root_filter) 
+                    || file_id.starts_with(&normalized_filter)
+                    || file_id == *root_filter;
+                
+                if !matches {
                     continue;
                 }
             }

@@ -116,16 +116,26 @@ pub struct StatsCommand {
     /// Incluir información de tamaño en bytes.
     #[arg(long)]
     pub size: bool,
+
+    // AN-03 FIX: Heatmap de actividad
+    /// Mostrar mapa de calor de actividad por mes.
+    #[arg(long)]
+    pub heatmap: bool,
+
+    /// P2-C3: Usar caché para estadísticas (sled).
+    #[arg(long)]
+    pub cache: bool,
 }
 
 impl StatsCommand {
     /// Ejecuta el comando.
     pub fn run(&self, data_dir: &std::path::Path) -> OcResult<(ProjectStats, Vec<ModuleStats>)> {
-        use regex::Regex;
+        
         use std::collections::HashMap;
         use std::fs;
 
-        let link_re = Regex::new(r"\[\[([^\]|]+)").unwrap();
+        use crate::core::patterns::RE_WIKI_LINK_WITH_ALIAS;
+        let link_re = &*RE_WIKI_LINK_WITH_ALIAS;
 
         // Collect all .md files using WalkDir (RECURSIVE)
         use walkdir::WalkDir;
@@ -481,6 +491,34 @@ pub fn run(cmd: StatsCommand, cli: &crate::CliConfig) -> anyhow::Result<()> {
                 0.0
             };
             println!("  Promedio: {:.0} bytes/doc", avg);
+        }
+
+        // AN-03 FIX: Heatmap de actividad
+        if cmd.heatmap {
+            use std::collections::BTreeMap;
+            let mut month_activity: BTreeMap<String, usize> = BTreeMap::new();
+            
+            for entry in WalkDir::new(&data_dir).into_iter().filter_map(|e| e.ok()) {
+                let path = entry.path();
+                if !path.is_file() || path.extension().map(|e| e != "md").unwrap_or(true) {
+                    continue;
+                }
+                if let Ok(meta) = std::fs::metadata(path) {
+                    if let Ok(modified) = meta.modified() {
+                        let datetime: chrono::DateTime<chrono::Utc> = modified.into();
+                        let key = datetime.format("%Y-%m").to_string();
+                        *month_activity.entry(key).or_insert(0) += 1;
+                    }
+                }
+            }
+            
+            println!("\n📊 Heatmap de Actividad (por mes):");
+            let max = month_activity.values().max().copied().unwrap_or(1);
+            for (month, count) in &month_activity {
+                let bar_len = (*count * 30) / max;
+                let bar = "█".repeat(bar_len);
+                println!("  {} │{:40} {:>4}", month, bar, count);
+            }
         }
     }
 

@@ -4,7 +4,6 @@
 
 use crate::errors::OcResult;
 use clap::Parser;
-use regex::Regex;
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::PathBuf;
@@ -198,9 +197,9 @@ pub struct VerifyCommand {
     #[arg(long)]
     pub json: bool,
 
-    /// Ejecutar solo fase específica.
+    /// Ejecutar solo fase específica (número 1-21 o nombre como 'yaml', 'links', etc.).
     #[arg(long)]
-    pub phase: Option<u8>,
+    pub phase: Option<String>,
 
     /// Modo silencioso (solo errores).
     #[arg(short, long)]
@@ -209,10 +208,53 @@ pub struct VerifyCommand {
     /// Modo rápido: omite fases lentas (V16, V17, V19).
     #[arg(short = 'Q', long)]
     pub quick: bool,
+
+    /// P3-B1: Mostrar barra de progreso durante verificación.
+    #[arg(long)]
+    pub progress: bool,
+
+    /// P2-C1: Usar caché para verificaciones repetidas (sled).
+    #[arg(long)]
+    pub cache: bool,
 }
 
 /// Fases a omitir en modo quick (consumen mucho tiempo)
 const SLOW_PHASES: [u8; 3] = [16, 17, 19]; // min_content, placeholders, orphans
+
+/// AN-01 FIX: Parsea fase por número o nombre
+fn parse_phase(input: &str) -> Option<u8> {
+    // Intenta número directo
+    if let Ok(n) = input.parse::<u8>() {
+        if (1..=21).contains(&n) {
+            return Some(n);
+        }
+    }
+    // Mapea nombres a números
+    match input.to_lowercase().as_str() {
+        "file_count" | "files" => Some(1),
+        "yaml" | "yaml_validation" => Some(2),
+        "unique_ids" | "ids" => Some(3),
+        "valid_parents" | "parents" => Some(4),
+        "breadcrumbs" | "breadcrumb" => Some(5),
+        "types" | "type" => Some(6),
+        "status" => Some(7),
+        "dates_sync" | "dates" => Some(8),
+        "internal_links" | "links" => Some(9),
+        "embeds" => Some(10),
+        "images" => Some(11),
+        "code_blocks" | "code" => Some(12),
+        "mermaid" => Some(13),
+        "tables" => Some(14),
+        "headings" => Some(15),
+        "min_content" | "content" => Some(16),
+        "placeholders" => Some(17),
+        "duplicates" => Some(18),
+        "orphans" => Some(19),
+        "children_count" | "children" => Some(20),
+        "hash_integrity" | "hash" => Some(21),
+        _ => None,
+    }
+}
 
 impl VerifyCommand {
     /// Ejecuta la verificación completa.
@@ -247,8 +289,13 @@ impl VerifyCommand {
 
         for (id, name, desc) in phase_specs.iter() {
             // Skip si se especificó una fase específica
-            if let Some(only_phase) = self.phase {
-                if *id != only_phase {
+            if let Some(phase_input) = &self.phase {
+                if let Some(only_phase) = parse_phase(phase_input) {
+                    if *id != only_phase {
+                        continue;
+                    }
+                } else {
+                    eprintln!("⚠️ Fase no reconocida: '{}'. Use 1-21 o nombre como 'yaml', 'links', etc.", phase_input);
                     continue;
                 }
             }
@@ -587,11 +634,7 @@ impl VerifyCommand {
                                 // Parse YAML date: "YYYY-MM-DD HH:MM" or "YYYY-MM-DD"
                                 if let Some(yaml_secs) = Self::parse_date_to_secs(&yaml_date) {
                                     // Difference in minutes
-                                    let diff_secs = if fs_secs > yaml_secs {
-                                        fs_secs - yaml_secs
-                                    } else {
-                                        yaml_secs - fs_secs
-                                    };
+                                    let diff_secs = fs_secs.abs_diff(yaml_secs);
                                     let diff_minutes = diff_secs / 60;
 
                                     // Threshold: 24 hours (1440 minutes)
@@ -666,7 +709,8 @@ impl VerifyCommand {
             }
         }
 
-        let link_re = Regex::new(r"\[\[([^\]|]+)(?:\|[^\]]+)?\]\]").unwrap();
+        use crate::core::patterns::RE_WIKI_LINK_WITH_ALIAS;
+        let link_re = &*RE_WIKI_LINK_WITH_ALIAS;
 
         for path in &files {
             if let Ok(content) = fs::read_to_string(path) {
@@ -724,7 +768,8 @@ impl VerifyCommand {
 
     fn phase_embeds(&self, phase: &mut VerificationPhase, data_dir: &PathBuf) {
         let files = Self::get_md_files(data_dir);
-        let embed_re = Regex::new(r"!\[\[([^\]]+)\]\]").unwrap();
+        use crate::core::patterns::RE_OBSIDIAN_EMBED;
+        let embed_re = &*RE_OBSIDIAN_EMBED;
 
         for path in files {
             if let Ok(content) = fs::read_to_string(&path) {
@@ -757,7 +802,8 @@ impl VerifyCommand {
 
     fn phase_images(&self, phase: &mut VerificationPhase, data_dir: &PathBuf) {
         let files = Self::get_md_files(data_dir);
-        let img_re = Regex::new(r"!\[([^\]]*)\]\(([^)]+)\)").unwrap();
+        use crate::core::patterns::RE_IMAGE;
+        let img_re = &*RE_IMAGE;
 
         for path in files {
             if let Ok(content) = fs::read_to_string(&path) {
@@ -818,7 +864,8 @@ impl VerifyCommand {
 
     fn phase_mermaid(&self, phase: &mut VerificationPhase, data_dir: &PathBuf) {
         let files = Self::get_md_files(data_dir);
-        let mermaid_re = Regex::new(r"```mermaid\s*([\s\S]*?)```").unwrap();
+        use crate::core::patterns::RE_MERMAID;
+        let mermaid_re = &*RE_MERMAID;
 
         for path in files {
             if let Ok(content) = fs::read_to_string(&path) {
@@ -1075,7 +1122,8 @@ impl VerifyCommand {
 
         // Build set of all references
         let mut all_refs: HashSet<String> = HashSet::new();
-        let link_re = Regex::new(r"\[\[([^\]|]+)").unwrap();
+        use crate::core::patterns::RE_WIKI_LINK_WITH_ALIAS;
+        let link_re = &*RE_WIKI_LINK_WITH_ALIAS;
 
         for path in &files {
             if let Ok(content) = fs::read_to_string(path) {
@@ -1287,12 +1335,23 @@ pub fn run(cmd: VerifyCommand, cli: &crate::commands::CliConfig) -> anyhow::Resu
             }))?
         );
     } else {
+        // FIX NUCLEAR C1: Imprimir CADA error y warning detalladamente
         for phase in &result.phases {
             let status = if phase.passed { "✅" } else { "❌" };
             println!(
                 "{} Fase {}: {} ({}ms)",
                 status, phase.id, phase.name, phase.duration_ms
             );
+            
+            // Imprimir errores con color rojo
+            for error in &phase.errors {
+                println!("   \x1b[31m✗ ERROR:\x1b[0m {}", error);
+            }
+            
+            // Imprimir warnings con color amarillo
+            for warning in &phase.warnings {
+                println!("   \x1b[33m⚠ WARNING:\x1b[0m {}", warning);
+            }
         }
         println!(
             "\n📊 {}/{} fases pasaron, {} errores, {} warnings",
@@ -1302,6 +1361,7 @@ pub fn run(cmd: VerifyCommand, cli: &crate::commands::CliConfig) -> anyhow::Resu
             result.total_warnings
         );
     }
+
 
     std::process::exit(VerifyCommand::exit_code(&result));
 }

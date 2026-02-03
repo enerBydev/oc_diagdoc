@@ -62,7 +62,9 @@ impl FromStr for OcDate {
         }
 
         if let Ok(dt) = NaiveDate::parse_from_str(s, "%Y-%m-%d") {
-            let dt = dt.and_hms_opt(0, 0, 0).unwrap();
+            let dt = dt
+                .and_hms_opt(0, 0, 0)
+                .ok_or_else(|| OcError::InvalidDate(format!("{}: invalid time components", s)))?;
             return Ok(Self(DateTime::from_naive_utc_and_offset(dt, Utc)));
         }
 

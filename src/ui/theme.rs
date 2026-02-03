@@ -211,7 +211,8 @@ pub fn icon(name: &str, text: &str) -> String {
 
 /// Banner ASCII de OnlyCar.
 pub fn print_banner() {
-    let banner = r#"
+    let version = env!("CARGO_PKG_VERSION");
+    let banner = format!(r#"
 ╔═══════════════════════════════════════════════════════════════════════════╗
 ║   ___              _         _____              _   _  _     ____         ║
 ║  / _ \  _ __  | | _   _ / ____|__ _ _ __   | \ | || |   |  _ \         ║
@@ -220,14 +221,15 @@ pub fn print_banner() {
 ║  \___/ |_| |_||_| \__, | \_____\__,_||_|     |_| \_||_____|____/         ║
 ║                    |___/                                                   ║
 ║                                                                           ║
-║   🚗 oc_diagdoc v3.0.1  |  Motor Algorítmico Nuclear  |  🦀 Rust Puro     ║
+║   🚗 oc_diagdoc v{}  |  Motor Algorítmico Nuclear  |  🦀 Rust Puro    ║
 ╚═══════════════════════════════════════════════════════════════════════════╝
-"#;
+"#, version);
     println!("{}", banner.cyan());
 }
 
 /// Banner compacto.
 pub fn print_banner_compact() {
+    let version = env!("CARGO_PKG_VERSION");
     println!(
         "{}",
         "══════════════════════════════════════════════".cyan()
@@ -235,7 +237,7 @@ pub fn print_banner_compact() {
     println!(
         "  {} {} {}",
         "🚗".to_string(),
-        "oc_diagdoc v3.0.1".blue().bold(),
+        format!("oc_diagdoc v{}", version).blue().bold(),
         "| Motor Algorítmico Nuclear".dimmed()
     );
     println!(

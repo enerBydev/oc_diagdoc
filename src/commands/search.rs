@@ -126,7 +126,25 @@ pub struct SearchCommand {
     /// Máximo de resultados.
     #[arg(short, long)]
     pub max_results: Option<usize>,
+
+    // P2: Nuevas flags de paridad con Python v16
+    /// Filtrar por módulo específico (ej: 1, 2, 3...).
+    #[arg(long)]
+    pub module: Option<u8>,
+
+    /// Buscar solo en campo YAML específico (ej: title, status, tags).
+    #[arg(long)]
+    pub field: Option<String>,
+
+    /// Formato de salida: text, json, csv
+    #[arg(long, default_value = "text")]
+    pub format: String,
+
+    /// P2-D3: Usar búsqueda fuzzy/aproximada.
+    #[arg(long)]
+    pub fuzzy: bool,
 }
+
 
 impl SearchCommand {
     /// Ejecuta la búsqueda.
@@ -239,6 +257,10 @@ mod tests {
             content_only: false,
             context: 2,
             max_results: None,
+            module: None,
+            field: None,
+            format: "text".to_string(),
+            fuzzy: false,
         };
 
         let content = "line1\nhello world\nline3";
@@ -247,6 +269,7 @@ mod tests {
         assert_eq!(matches.len(), 1);
         assert_eq!(matches[0].line_number, 2);
     }
+
 
     #[test]
     fn test_highlighted_line() {

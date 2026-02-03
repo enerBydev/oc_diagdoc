@@ -111,7 +111,7 @@ pub struct ModuleCommand {
 impl ModuleCommand {
     pub fn run(&self, data_dir: &std::path::Path) -> OcResult<ModuleResult> {
         use crate::core::files::{get_all_md_files, read_file_content, ScanOptions};
-        use regex::Regex;
+        
         use std::collections::HashMap;
 
         let mut result = ModuleResult::new();
@@ -130,7 +130,8 @@ impl ModuleCommand {
         let options = ScanOptions::new();
         let files = get_all_md_files(data_dir, &options)?;
 
-        let module_regex = Regex::new(r#"module:\s*["']?([^"'\n]+)["']?"#).unwrap();
+        use crate::core::patterns::RE_MODULE;
+        let module_regex = &*RE_MODULE;
         let mut module_stats: HashMap<String, ModuleInfo> = HashMap::new();
 
         for file_path in &files {
@@ -249,7 +250,9 @@ last_updated: "{}"
         let options = ScanOptions::new();
         let files = get_all_md_files(data_dir, &options)?;
 
-        let id_regex = Regex::new(r#"document_id:\s*["']?([^"'\n]+)["']?"#).unwrap();
+        use crate::core::patterns::RE_DOCUMENT_ID;
+        let id_regex = &*RE_DOCUMENT_ID;
+        // Nota: module_regex dinámico para replace, NO migrable
         let module_regex = Regex::new(r#"(module:\s*["']?)([^"'\n]+)(["']?)"#).unwrap();
 
         for file_path in &files {

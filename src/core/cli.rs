@@ -3,6 +3,7 @@
 //! Punto de entrada y orquestación del CLI.
 
 use clap::Parser;
+use crate::DEFAULT_DATA_DIR;
 use std::path::PathBuf;
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -13,7 +14,7 @@ use std::path::PathBuf;
 #[derive(Parser, Debug, Clone)]
 #[command(
     name = "oc_diagdoc",
-    version = "3.0.1",
+    version = env!("CARGO_PKG_VERSION"),
     about = "Sistema de diagnóstico de documentación"
 )]
 pub struct CliApp {
@@ -57,7 +58,7 @@ impl Default for CliApp {
         Self {
             verbose: false,
             quiet: false,
-            data_dir: PathBuf::from("Datos"),
+            data_dir: PathBuf::from(DEFAULT_DATA_DIR),
             format: "text".to_string(),
             config: None,
         }

@@ -206,6 +206,8 @@ impl WatchCommand {
             phase: None,
             quiet: true,
             quick: true, // F1.4: usar modo quick en watch para rapidez
+            progress: false,
+            cache: false,
         };
 
         if let Ok(result) = verify_cmd.run(&data_dir_buf) {

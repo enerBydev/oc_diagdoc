@@ -13,7 +13,7 @@ use oc_diagdoc_lib::{commands, CliConfig};
 #[derive(Parser, Debug)]
 #[command(
     name = "oc_diagdoc",
-    version = "3.0.1",
+    version = env!("CARGO_PKG_VERSION"),
     author = "enerbydev <dev@onlycar.mx>",
     about = "Motor algorítmico nuclear para documentación OnlyCarNLD",
     long_about = None
@@ -25,6 +25,10 @@ pub struct Cli {
     /// Modo verbose
     #[arg(short, long, global = true)]
     pub verbose: bool,
+
+    /// Modo silencioso (suprimir output no esencial)
+    #[arg(short, long, global = true)]
+    pub quiet: bool,
 
     /// Directorio de datos
     #[arg(long, global = true, default_value = "Datos")]
@@ -41,6 +45,7 @@ impl Cli {
     pub fn to_config(&self) -> CliConfig {
         CliConfig {
             verbose: self.verbose,
+            quiet: self.quiet,
             data_dir: self.data_dir.clone(),
         }
     }
@@ -49,7 +54,8 @@ impl Cli {
 /// F7: Genera documentación README completa del CLI
 #[cfg(feature = "cli")]
 fn generate_readme() {
-    let readme = r#"# oc_diagdoc CLI v3.0.1
+    let version = env!("CARGO_PKG_VERSION");
+    let readme = format!(r#"# oc_diagdoc CLI v{}
 
 Motor algorítmico nuclear para documentación OnlyCarNLD.
 
@@ -151,8 +157,8 @@ oc_diagdoc sync --dry-run --fix-descendants --path ./Datos
 
 ---
 
-**Generado por oc_diagdoc v3.0.1**
-"#;
+**Generado por oc_diagdoc v{}**
+"#, version, version);
 
     println!("{}", readme);
 }

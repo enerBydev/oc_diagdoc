@@ -130,38 +130,70 @@ pub struct LinksCommand {
     /// Incluir enlaces externos.
     #[arg(long)]
     pub include_external: bool,
+
+    // P2: Nuevas flags de paridad con Python v16
+    /// Buscar todas las referencias a un documento específico.
+    #[arg(long)]
+    pub find_refs: Option<String>,
+
+    /// Renombrar documento y actualizar todas sus referencias.
+    #[arg(long)]
+    pub rename: Option<String>,
+
+    /// Crear backup antes de modificar archivos.
+    #[arg(long)]
+    pub backup: bool,
 }
+
 
 impl LinksCommand {
     pub fn run(&self, data_dir: &std::path::Path) -> OcResult<LinksResult> {
         use crate::core::files::{get_all_md_files, read_file_content, ScanOptions};
-        use regex::Regex;
+        use crate::core::patterns::{RE_WIKI_LINK, RE_MD_LINK};
 
         let mut result = LinksResult::new();
 
         // Patrones para detectar enlaces
-        let wiki_link = Regex::new(r"\[\[([^\]]+)\]\]").unwrap();
-        let md_link = Regex::new(r"\[([^\]]+)\]\(([^)]+)\)").unwrap();
+        let wiki_link = &*RE_WIKI_LINK;
+        let md_link = &*RE_MD_LINK;
 
         let options = ScanOptions::new();
         let files = get_all_md_files(data_dir, &options)?;
 
         for file_path in &files {
             if let Ok(content) = read_file_content(file_path) {
+                // FP-01 FIX: Tracking de bloques de código
+                let mut in_code_block = false;
+                
                 // Buscar wiki links [[target]]
                 for (line_idx, line) in content.lines().enumerate() {
+                    // FP-01 FIX: Detectar inicio/fin de code block
+                    let trimmed = line.trim_start();
+                    if trimmed.starts_with("```") || trimmed.starts_with("~~~") {
+                        in_code_block = !in_code_block;
+                        continue;
+                    }
+                    
+                    // FP-01 FIX: Skip líneas dentro de code blocks
+                    if in_code_block {
+                        continue;
+                    }
+                    
                     for cap in wiki_link.captures_iter(line) {
                         let target = &cap[1];
 
                         // Detectar si tiene path (contiene /) - esto es no-estándar
                         let has_path = target.contains('/');
 
-                        // Extraer nombre normalizado (sin path, sin alias)
+                        // Extraer nombre normalizado (sin path, sin alias, sin anchor)
                         let normalized_name = target
                             .split('/')
-                            .last()
+                            .next_back()
                             .unwrap_or(target)
                             .split('|')
+                            .next()
+                            .unwrap_or(target)
+                            .split('#')  // FP-02 FIX: Remover anchor
                             .next()
                             .unwrap_or(target)
                             .trim()
@@ -252,11 +284,11 @@ impl LinksCommand {
             }
         }
 
-        // Extraer solo el nombre del documento del target (ignorar path completo)
-        // Para links tipo [[Proyecto OnlyCarNLD/Datos/2.8.1 Politicas_Seguridad]]
-        let target_name = target.split('/').last().unwrap_or(target);
+        let target_name = target.split('/').next_back().unwrap_or(target);
         // Remover pipe alias [[doc|alias]] -> doc
-        let target_name = target_name.split('|').next().unwrap_or(target_name).trim();
+        let target_name = target_name.split('|').next().unwrap_or(target_name);
+        // FP-02 FIX: Remover fragmento anchor [[doc#section]] -> doc
+        let target_name = target_name.split('#').next().unwrap_or(target_name).trim();
 
         // Intentar resolver el path
         let resolved = if target.starts_with('/') {
@@ -372,7 +404,70 @@ mod tests {
 /// Función run para CLI.
 #[cfg(feature = "cli")]
 pub fn run(cmd: LinksCommand, cli: &crate::CliConfig) -> anyhow::Result<()> {
+    use crate::core::files::{get_all_md_files, read_file_content, ScanOptions};
+    use regex::Regex;
+    
     let data_dir = std::path::Path::new(&cli.data_dir);
+    
+    // Handle --find-refs: buscar todas las referencias a un documento
+    if let Some(ref target_id) = cmd.find_refs {
+        println!("\n🔍 Buscando referencias a: {}", target_id);
+        println!("{}", "─".repeat(60));
+        
+        let pattern = Regex::new(&format!(r"\[\[{}[|\]]", regex::escape(target_id)))?;
+        let options = ScanOptions::new();
+        let files = get_all_md_files(data_dir, &options)?;
+        
+        let mut references: Vec<(String, usize, String)> = Vec::new();
+        
+        for file_path in &files {
+            if let Ok(content) = read_file_content(file_path) {
+                let file_name = file_path.file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("unknown");
+                
+                for (line_idx, line) in content.lines().enumerate() {
+                    if pattern.find(line).is_some() {
+                        let fragment = if line.len() > 50 {
+                            format!("{}...", &line[..50])
+                        } else {
+                            line.to_string()
+                        };
+                        references.push((file_name.to_string(), line_idx + 1, fragment));
+                    }
+                }
+            }
+        }
+        
+        if references.is_empty() {
+            println!("ℹ️  No se encontraron referencias a [[{}]]", target_id);
+        } else {
+            println!("\n  # │ Archivo                              │ Línea │ Fragmento");
+            println!("────┼────────────────────────────────────────┼───────┼──────────────────────────────");
+            
+            for (i, (file, line, fragment)) in references.iter().enumerate() {
+                println!("{:3} │ {:38} │ {:5} │ {}", 
+                    i + 1,
+                    if file.len() > 38 { &file[..38] } else { file },
+                    line,
+                    if fragment.len() > 30 { &fragment[..30] } else { fragment }
+                );
+            }
+            
+            println!("\n✅ Total referencias: {}", references.len());
+        }
+        
+        return Ok(());
+    }
+    
+    // Handle --rename: renombrar documento y actualizar referencias
+    if cmd.rename.is_some() {
+        println!("⚠️  --rename aún no implementado en esta versión.");
+        println!("   Usa: python3 refactor_links.py --rename OLD NEW");
+        return Ok(());
+    }
+    
+    // Default: análisis de enlaces
     let result = cmd.run(data_dir)?;
 
     if cmd.broken_only {
@@ -402,3 +497,4 @@ pub fn run(cmd: LinksCommand, cli: &crate::CliConfig) -> anyhow::Result<()> {
 
     Ok(())
 }
+

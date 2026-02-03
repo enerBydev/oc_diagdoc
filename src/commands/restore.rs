@@ -87,7 +87,8 @@ impl RestoreCommand {
         let options = ScanOptions::new();
         let archived_files = get_all_md_files(&archive_dir, &options)?;
 
-        let id_regex = Regex::new(r#"document_id:\s*["']?([^"'\n]+)["']?"#).unwrap();
+        use crate::core::patterns::RE_DOCUMENT_ID;
+        let id_regex = &*RE_DOCUMENT_ID;
 
         for file_path in &archived_files {
             if let Ok(content) = read_file_content(file_path) {

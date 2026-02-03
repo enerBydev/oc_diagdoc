@@ -13,7 +13,7 @@
 ║  ██║   ██║██║         ██║  ██║██║███████║██║  ███╗            ║
 ║  ██║   ██║██║         ██║  ██║██║██╔══██║██║   ██║            ║
 ║  ╚██████╔╝╚██████╗    ██████╔╝██║██║  ██║╚██████╔╝            ║
-║   ╚═════╝  ╚═════╝    ╚═════╝ ╚═╝╚═╝  ╚═╝ ╚═════╝  DOC v3.0.1 ║
+║   ╚═════╝  ╚═════╝    ╚═════╝ ╚═╝╚═╝  ╚═╝ ╚═════╝  DOC v3.1.0 ║
 ╚═══════════════════════════════════════════════════════════════╝
 ```
 
@@ -46,6 +46,10 @@
 | **Exportación Multi-formato** | Markdown, HTML, JSON, LaTeX |
 | **Watch Mode** | Monitoreo en tiempo real de cambios |
 | **CI/CD Ready** | Exit codes semánticos y reportes JUnit |
+| **Modo Quiet** | Flag global `-q/--quiet` para suprimir output no esencial |
+| **Progress Bars** | Barras de progreso interactivas con indicatif |
+| **Caché Sled** | Caché persistente para verificaciones repetidas |
+| **Búsqueda Fuzzy** | Búsqueda aproximada tolerante a errores tipográficos |
 
 ---
 
@@ -134,6 +138,84 @@ oc_diagdoc export --format html --output ./export
 
 ---
 
+## 🚩 Flags Globales
+
+Estos flags están disponibles para todos los comandos:
+
+| Flag | Descripción |
+|------|-------------|
+| `-q, --quiet` | Modo silencioso, suprime output no esencial |
+| `-v, --verbose` | Modo detallado con información extra |
+| `--data-dir <PATH>` | Directorio de datos (override del config) |
+| `--config <FILE>` | Archivo de configuración personalizado |
+
+---
+
+## 🔧 Flags Avanzados por Comando
+
+### `verify`
+| Flag | Descripción |
+|------|-------------|
+| `--progress` | Mostrar barra de progreso interactiva |
+| `--cache` | Usar caché sled para acelerar verificaciones |
+| `--quick` | Verificación rápida (solo fases críticas) |
+| `--strict` | Fallar en cualquier warning |
+
+### `batch`
+| Flag | Descripción |
+|------|-------------|
+| `--progress` | Mostrar barra de progreso |
+| `--filter <PATTERN>` | Filtrar archivos por patrón glob |
+| `--dry-run` | Simular sin modificar archivos |
+
+### `search`
+| Flag | Descripción |
+|------|-------------|
+| `--fuzzy` | Búsqueda aproximada tolerante a errores |
+| `--module <ID>` | Filtrar por módulo específico |
+| `--field <NAME>` | Buscar solo en campo YAML específico |
+| `--format <FMT>` | Formato de salida (text/json/table) |
+
+### `stats`
+| Flag | Descripción |
+|------|-------------|
+| `--cache` | Usar caché para estadísticas |
+| `--heatmap` | Generar heatmap de cobertura |
+
+### `tree`
+| Flag | Descripción |
+|------|-------------|
+| `--root <ID>` | Nodo raíz para visualización (matching flexible) |
+| `--show-status` | Mostrar estado de cada documento |
+| `--format <FMT>` | Formato de salida (ascii/json/md) |
+| `--output <FILE>` | Guardar resultado en archivo |
+| `--depth <N>` | Profundidad máxima del árbol |
+
+### `lint`
+| Flag | Descripción |
+|------|-------------|
+| `--show-fixes` | Mostrar sugerencias de corrección detalladas |
+| `--fix` | Aplicar correcciones automáticamente |
+
+### `compress`
+| Flag | Descripción |
+|------|-------------|
+| `--preview` | Mostrar output sin escribir archivo |
+| `--pdf` | Generar versión PDF (requiere pandoc) |
+
+### `sync`
+| Flag | Descripción |
+|------|-------------|
+| `--force` | Forzar actualización de todas las fechas |
+| Estadísticas extendidas: `hashes_initialized`, `hashes_updated` |
+
+### `deps`
+| Flag | Descripción |
+|------|-------------|
+| Reporte detallado de huérfanos: `reason`, `invalid_parent` |
+
+---
+
 ## ⚙️ Configuración
 
 Crear archivo `.oc-diagdoc.yaml` en la raíz del proyecto:
@@ -167,6 +249,36 @@ output:
 
 ```bash
 oc_diagdoc verify ./Datos --module 3 --quick
+```
+
+### Verificación con progreso y caché (v3.1.0)
+
+```bash
+oc_diagdoc verify ./Datos --progress --cache
+```
+
+### Búsqueda fuzzy tolerante a errores (v3.1.0)
+
+```bash
+oc_diagdoc search "configracion" --fuzzy
+```
+
+### Árbol jerárquico con root flexible (v3.1.0)
+
+```bash
+oc_diagdoc tree --root 1.1 --show-status --format json --output tree.json
+```
+
+### Preview de compresión sin escribir (v3.1.0)
+
+```bash
+oc_diagdoc compress --preview --format md
+```
+
+### Lint con sugerencias de corrección (v3.1.0)
+
+```bash
+oc_diagdoc lint --show-fixes
 ```
 
 ### Exportar solo documentos activos

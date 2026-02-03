@@ -70,11 +70,29 @@ pub struct InitCommand {
     /// Nombre del proyecto/módulo.
     #[arg(long)]
     pub name: Option<String>,
+
+    // AN-08 FIX: Dry-run mode
+    /// Modo preview: muestra qué se crearía sin ejecutar.
+    #[arg(long)]
+    pub dry_run: bool,
 }
 
 impl InitCommand {
     pub fn run(&self) -> OcResult<InitResult> {
         let mut result = InitResult::new(self.path.clone());
+
+        // AN-08 FIX: Dry-run mode - muestra preview sin ejecutar
+        if self.dry_run {
+            eprintln!("🔍 [dry-run] Se crearía en: {}", self.path.display());
+            eprintln!("  📁 {}/Datos/", self.path.display());
+            eprintln!("  📄 {}/Datos/0. Contexualizador.md", self.path.display());
+            eprintln!("  📄 {}/oc_diagdoc.yaml", self.path.display());
+            if self.preset == "full" {
+                eprintln!("  📁 {}/templates/", self.path.display());
+                eprintln!("  📁 {}/snapshots/", self.path.display());
+            }
+            return Ok(result);
+        }
 
         // Verificar si ya existe
         if self.path.join("oc_diagdoc.yaml").exists() && !self.force {
@@ -312,6 +330,7 @@ mod tests {
             force: false,
             template: "proyecto".to_string(),
             name: None,
+            dry_run: false,
         };
         assert_eq!(cmd.preset_enum(), InitPreset::Minimal);
     }
@@ -324,6 +343,7 @@ mod tests {
             force: true,
             template: "proyecto".to_string(),
             name: Some("TestProject".to_string()),
+            dry_run: false,
         };
         assert_eq!(cmd.preset_enum(), InitPreset::Full);
         assert!(cmd.force);

@@ -66,7 +66,7 @@ pub struct ReadmeCommand {
 impl ReadmeCommand {
     pub fn run(&self, data_dir: &std::path::Path) -> OcResult<ReadmeResult> {
         use crate::core::files::{get_all_md_files, read_file_content, ScanOptions};
-        use regex::Regex;
+        
         use std::collections::HashMap;
 
         let output_path = self
@@ -78,7 +78,8 @@ impl ReadmeCommand {
         let options = ScanOptions::new();
         let files = get_all_md_files(data_dir, &options)?;
 
-        let module_regex = Regex::new(r#"module:\s*["']?([^"'\n]+)["']?"#).unwrap();
+        use crate::core::patterns::RE_MODULE;
+        let module_regex = &*RE_MODULE;
 
         // Recolectar stats
         let mut module_stats: HashMap<String, usize> = HashMap::new();

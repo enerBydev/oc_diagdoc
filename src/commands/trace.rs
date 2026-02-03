@@ -150,7 +150,7 @@ pub struct TraceCommand {
 impl TraceCommand {
     pub fn run(&self, data_dir: &std::path::Path) -> OcResult<TraceResult> {
         use crate::core::files::{get_all_md_files, read_file_content, ScanOptions};
-        use regex::Regex;
+        
         use std::collections::HashMap;
 
         let mut result = TraceResult::new(&self.document_id);
@@ -159,8 +159,9 @@ impl TraceCommand {
         let files = get_all_md_files(data_dir, &options)?;
 
         // Regex para parent_id y wiki links
-        let parent_regex = Regex::new(r#"parent_id:\s*["']?([^"'\s\n]+)["']?"#).unwrap();
-        let wiki_link = Regex::new(r"\[\[([^\]]+)\]\]").unwrap();
+        use crate::core::patterns::{RE_PARENT_ID, RE_WIKI_LINK};
+        let parent_regex = &*RE_PARENT_ID;
+        let wiki_link = &*RE_WIKI_LINK;
 
         // Construir mapas de relaciones
         let mut parent_map: HashMap<String, String> = HashMap::new(); // id -> parent_id

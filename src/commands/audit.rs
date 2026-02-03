@@ -174,6 +174,9 @@ impl AuditCommand {
             broken_only: false,
             include_external: false,
             fix: false,
+            find_refs: None,
+            rename: None,
+            backup: false,
         };
         if let Ok(links_result) = links_cmd.run(data_dir) {
             // Finding: Enlaces rotos
@@ -224,10 +227,12 @@ impl AuditCommand {
         let lint_cmd = LintCommand {
             path: None,
             fix: false,
+            dry_run: false,
             errors_only: false,
             json: false,
             rule: None,
             summary: false,
+            show_fixes: false,
         };
         if let Ok(lint_result) = lint_cmd.run(data_dir) {
             // Finding: Errores de lint
@@ -388,6 +393,13 @@ pub fn run(cmd: AuditCommand, cli: &crate::CliConfig) -> anyhow::Result<()> {
                 println!("  💡 {}", f.recommendation);
             }
         }
+    }
+
+    // AN-02 FIX: Implementar escritura a archivo cuando --export está presente
+    if let Some(export_path) = &cmd.export {
+        let json = serde_json::to_string_pretty(&result)?;
+        std::fs::write(export_path, &json)?;
+        println!("📄 Exportado a: {}", export_path.display());
     }
 
     Ok(())

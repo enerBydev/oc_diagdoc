@@ -116,6 +116,10 @@ pub struct LintCommand {
     #[arg(long)]
     pub fix: bool,
 
+    /// Modo dry-run: mostrar cambios sin aplicar (requiere --fix).
+    #[arg(long)]
+    pub dry_run: bool,
+
     /// Solo errores, omitir warnings/hints.
     #[arg(long)]
     pub errors_only: bool,
@@ -132,6 +136,10 @@ pub struct LintCommand {
     /// Mostrar estadísticas por categoría.
     #[arg(long)]
     pub summary: bool,
+
+    /// P3-A3: Mostrar detalle de todos los fixes aplicables.
+    #[arg(long)]
+    pub show_fixes: bool,
 }
 
 impl LintCommand {
@@ -153,8 +161,12 @@ impl LintCommand {
                 // L4.4: Aplicar --fix si se solicitó
                 if self.fix {
                     if let Some(fixed_content) = self.fix_file(file_path, &content) {
-                        if std::fs::write(file_path, &fixed_content).is_ok() {
-                            files_fixed += 1;
+                        if self.dry_run {
+                            eprintln!("🔍 [DRY-RUN] Sería corregido: {}", file_path.display());
+                        } else {
+                            if std::fs::write(file_path, &fixed_content).is_ok() {
+                                files_fixed += 1;
+                            }
                         }
                     }
                 }
@@ -412,9 +424,9 @@ impl LintCommand {
 
     /// L4.2 Regla: Tablas deben tener fila de header.
     fn rule_table_headers(&self, file_path: &PathBuf, lines: &[&str]) -> Vec<LintIssue> {
-        use regex::Regex;
-        let table_row = Regex::new(r"^\|.+\|$").unwrap();
-        let separator_row = Regex::new(r"^\|[\s:-]+\|$").unwrap();
+        use crate::core::patterns::{RE_TABLE_ROW, RE_TABLE_SEPARATOR};
+        let table_row = &*RE_TABLE_ROW;
+        let separator_row = &*RE_TABLE_SEPARATOR;
 
         let mut issues = Vec::new();
         let mut i = 0;
@@ -444,9 +456,9 @@ impl LintCommand {
 
     /// L4.3 Regla: Imágenes deben tener alt text.
     fn rule_image_alt(&self, file_path: &PathBuf, lines: &[&str]) -> Vec<LintIssue> {
-        use regex::Regex;
+        use crate::core::patterns::RE_IMAGE_EMPTY_ALT;
         // Busca ![](path) donde alt text está vacío
-        let empty_alt = Regex::new(r"!\[\]\([^)]+\)").unwrap();
+        let empty_alt = &*RE_IMAGE_EMPTY_ALT;
 
         let mut issues = Vec::new();
         for (idx, line) in lines.iter().enumerate() {

@@ -131,7 +131,17 @@ pub struct BatchCommand {
     /// Eliminar campo YAML de todos los documentos.
     #[arg(long)]
     pub remove_field: Option<String>,
+
+    // P2: Nuevas flags de paridad con Python v16
+    /// Expresión de filtro compleja (ej: "status=draft AND module=3" o "type=leaf OR type=branch").
+    #[arg(long)]
+    pub filter: Option<String>,
+
+    /// P2-B2: Mostrar barra de progreso durante operaciones.
+    #[arg(long)]
+    pub progress: bool,
 }
+
 
 /// L17.2: Comando parseado desde .oc-batch
 #[derive(Debug, Clone)]
@@ -274,7 +284,8 @@ impl BatchCommand {
         let files = get_all_md_files(data_dir, &options)?;
 
         let field_regex = Regex::new(&format!(r#"{}:\s*["']?[^"'\n]+["']?"#, field)).ok();
-        let module_regex = Regex::new(r#"module:\s*["']?([^"'\n]+)["']?"#).unwrap();
+        use crate::core::patterns::RE_MODULE;
+        let module_regex = &*RE_MODULE;
 
         for file_path in &files {
             if let Ok(content) = read_file_content(file_path) {

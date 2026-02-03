@@ -42,3 +42,7 @@ benchmarks/results/
 
 # Generated docs
 /docs/generated/
+
+# Large binary files
+*.pdf
+compiled.pdf

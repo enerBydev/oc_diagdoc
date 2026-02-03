@@ -21,12 +21,22 @@ pub struct SyncChange {
     pub new_value: String,
 }
 
+/// D2: Resultado de comparación de hash de contenido.
+#[derive(Debug, Clone)]
+pub struct HashComparisonResult {
+    pub has_changed: bool,
+    pub current_hash: String,
+    pub stored_hash: Option<String>,
+}
+
 /// Resultado de sincronización.
 #[derive(Debug, Clone)]
 pub struct SyncResult {
     pub changes: Vec<SyncChange>,
     pub files_scanned: usize,
     pub files_modified: usize,
+    pub skipped_tolerance: usize,      // D3: Archivos sin cambios reales
+    pub hashes_initialized: usize,      // D3: Hashes inicializados
 }
 
 impl SyncResult {
@@ -35,6 +45,8 @@ impl SyncResult {
             changes: Vec::new(),
             files_scanned: 0,
             files_modified: 0,
+            skipped_tolerance: 0,
+            hashes_initialized: 0,
         }
     }
 
@@ -113,12 +125,22 @@ pub struct SyncCommand {
     /// Tolerancia en segundos para considerar fechas sincronizadas (default: 5).
     #[arg(long, default_value = "5")]
     pub tolerance: u64,
+
+    // P1: Nuevas flags de paridad con Python v16
+    /// Ejecutar TODAS las sincronizaciones (dates + hashes + breadcrumbs + children).
+    #[arg(long)]
+    pub fix_all: bool,
+
+    /// Filtrar por módulo específico (ej: 1, 2, 3...).
+    #[arg(long)]
+    pub module: Option<u8>,
 }
+
 
 impl SyncCommand {
     pub fn run(&self, data_dir: &std::path::Path) -> OcResult<SyncResult> {
         use crate::core::files::{get_all_md_files, read_file_content, ScanOptions};
-        use regex::Regex;
+        
         use std::collections::HashMap;
 
         let mut result = SyncResult::new();
@@ -127,9 +149,10 @@ impl SyncCommand {
         let files = get_all_md_files(data_dir, &options)?;
         result.files_scanned = files.len();
 
-        let date_regex = Regex::new(r#"last_updated:\s*["']?([^"'\n]+)["']?"#).unwrap();
-        let hash_regex = Regex::new(r#"content_hash:\s*["']?([^"'\n]+)["']?"#).unwrap();
-        let parent_regex = Regex::new(r#"parent_id:\s*["']?([^"'\n]+)["']?"#).unwrap();
+        use crate::core::patterns::{RE_LAST_UPDATED, RE_CONTENT_HASH, RE_PARENT_ID};
+        let date_regex = &*RE_LAST_UPDATED;
+        let hash_regex = &*RE_CONTENT_HASH;
+        let parent_regex = &*RE_PARENT_ID;
 
         // Construir mapa de children para L16.2
         let mut children_map: HashMap<String, Vec<String>> = HashMap::new();
@@ -161,31 +184,83 @@ impl SyncCommand {
                 let mut modified_content = content.clone();
                 let mut file_has_changes = false;
 
-                // L15.1 / L15.2: Detectar y actualizar fechas
+                // D6: Hash-based date synchronization (reemplaza mtime)
                 if !self.hashes_only {
-                    let file_mtime = std::fs::metadata(file_path)
-                        .and_then(|m| m.modified())
-                        .ok()
-                        .map(|t| {
-                            let dt: DateTime<Utc> = t.into();
-                            dt.format("%Y-%m-%d").to_string()
-                        });
-
-                    if let (Some(cap), Some(mtime)) = (date_regex.captures(&content), file_mtime) {
-                        let old_date = cap[1].trim().to_string();
-                        if self.force || old_date != mtime {
-                            result.add_change(SyncChange {
-                                path: file_path.clone(),
-                                field: "last_updated".to_string(),
-                                old_value: old_date.clone(),
-                                new_value: mtime.clone(),
-                            });
-                            let new_field = format!("last_updated: \"{}\"", mtime);
-                            modified_content = date_regex
-                                .replace(&modified_content, new_field.as_str())
-                                .to_string();
-                            file_has_changes = true;
+                    use sha2::{Digest, Sha256};
+                    
+                    // Calcular hash del contenido (excluyendo campos volátiles)
+                    let content_for_hash: String = content
+                        .lines()
+                        .filter(|l| {
+                            !l.starts_with("last_updated:") &&
+                            !l.starts_with("content_hash:") &&
+                            !l.starts_with("file_create:")
+                        })
+                        .collect::<Vec<_>>()
+                        .join("\n");
+                    
+                    let mut hasher = Sha256::new();
+                    hasher.update(content_for_hash.as_bytes());
+                    let current_hash = format!("{:x}", hasher.finalize())[..16].to_string();
+                    
+                    // Extraer hash almacenado
+                    let stored_hash = hash_regex
+                        .captures(&content)
+                        .map(|cap| cap[1].trim().to_string());
+                    
+                    let has_changed = match &stored_hash {
+                        Some(s) => s != &current_hash,
+                        None => false, // No hay hash previo
+                    };
+                    
+                    // Caso 1: Hash no existe → inicializar sin cambiar fecha
+                    if stored_hash.is_none() && !has_changed && !self.force {
+                        // Agregar hash si no existe (buscar después de frontmatter)
+                        if !content.contains("content_hash:") {
+                            // Insertar después de la primera línea ---
+                            if let Some(pos) = modified_content.find("---\n") {
+                                let insert_pos = pos + 4;
+                                modified_content.insert_str(insert_pos, &format!("content_hash: \"{}\"\n", current_hash));
+                                result.hashes_initialized += 1;
+                                file_has_changes = true;
+                            }
                         }
+                    }
+                    // Caso 2: Hash coincide → sin cambios reales
+                    else if stored_hash.is_some() && !has_changed && !self.force {
+                        result.skipped_tolerance += 1;
+                        // No hacer nada
+                    }
+                    // Caso 3: Hash difiere O force → actualizar fecha + hash
+                    else if has_changed || self.force {
+                        let new_date = Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+                        
+                        // Extraer fecha antigua
+                        let old_date = date_regex
+                            .captures(&content)
+                            .map(|c| c[1].trim().to_string())
+                            .unwrap_or_else(|| "N/A".to_string());
+                        
+                        result.add_change(SyncChange {
+                            path: file_path.clone(),
+                            field: "last_updated".to_string(),
+                            old_value: old_date.clone(),
+                            new_value: new_date.clone(),
+                        });
+                        
+                        // Actualizar fecha
+                        let date_field = format!("last_updated: \"{}\"", new_date);
+                        modified_content = date_regex
+                            .replace(&modified_content, date_field.as_str())
+                            .to_string();
+                        
+                        // Actualizar hash
+                        let hash_field = format!("content_hash: \"{}\"", current_hash);
+                        modified_content = hash_regex
+                            .replace(&modified_content, hash_field.as_str())
+                            .to_string();
+                        
+                        file_has_changes = true;
                     }
                 }
 
@@ -222,7 +297,8 @@ impl SyncCommand {
                 // L16.2: Sincronizar children_count
                 if self.children {
                     let children_count = children_map.get(file_id).map(|c| c.len()).unwrap_or(0);
-                    let count_regex = Regex::new(r#"children_count:\s*(\d+)"#).unwrap();
+                    use crate::core::patterns::RE_CHILDREN_COUNT;
+                    let count_regex = &*RE_CHILDREN_COUNT;
 
                     if let Some(cap) = count_regex.captures(&content) {
                         let old_count: usize = cap[1].parse().unwrap_or(0);
@@ -330,6 +406,14 @@ pub fn run(cmd: SyncCommand, cli: &crate::commands::CliConfig) -> anyhow::Result
     }
 
     println!("📊 {} archivos escaneados", result.files_scanned);
+    
+    // P1-A4: Mostrar estadísticas extendidas
+    if result.skipped_tolerance > 0 {
+        println!("⏭️  {} archivos sin cambios (hash coincide)", result.skipped_tolerance);
+    }
+    if result.hashes_initialized > 0 {
+        println!("🆕 {} hashes inicializados", result.hashes_initialized);
+    }
 
     if result.has_changes() {
         for change in &result.changes {
@@ -359,7 +443,8 @@ pub fn run(cmd: SyncCommand, cli: &crate::commands::CliConfig) -> anyhow::Result
         println!("\n🌳 Propagando sincronización a descendientes...");
 
         // Construir mapa de parents
-        let parent_re = regex::Regex::new(r#"parent_id:\s*["']?([^"'\n]+)["']?"#).unwrap();
+        use crate::core::patterns::RE_PARENT_ID;
+        let parent_re = &*RE_PARENT_ID;
         let mut children_map: HashMap<String, Vec<PathBuf>> = HashMap::new();
 
         use walkdir::WalkDir;
@@ -406,8 +491,9 @@ pub fn run(cmd: SyncCommand, cli: &crate::commands::CliConfig) -> anyhow::Result
     if cmd.fix_total {
         println!("\n📈 Recalculando totales en índices...");
 
-        let type_re = regex::Regex::new(r#"type:\s*["']?([^"'\n]+)["']?"#).unwrap();
-        let total_re = regex::Regex::new(r#"total_children:\s*(\d+)"#).unwrap();
+        use crate::core::patterns::{RE_TYPE, RE_TOTAL_CHILDREN};
+        let type_re = &*RE_TYPE;
+        let total_re = &*RE_TOTAL_CHILDREN;
 
         let mut indices_updated = 0;
 

@@ -95,7 +95,7 @@ pub struct ReportCommand {
 
 impl ReportCommand {
     pub fn run(&self, data_dir: &std::path::Path) -> OcResult<Report> {
-        use regex::Regex;
+        
         use std::collections::HashMap;
         use std::fs;
 
@@ -117,7 +117,8 @@ impl ReportCommand {
             .collect();
 
         // Calculate stats
-        let link_re = Regex::new(r"\[\[([^\]|]+)").unwrap();
+        use crate::core::patterns::RE_WIKI_LINK_WITH_ALIAS;
+        let link_re = &*RE_WIKI_LINK_WITH_ALIAS;
         let mut total_words = 0usize;
         let mut total_links = 0usize;
         let mut modules: HashMap<String, usize> = HashMap::new();
