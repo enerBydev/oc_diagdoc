@@ -17,7 +17,7 @@
 #![allow(clippy::expect_fun_call)]       // expect con fn call aceptable
 #![allow(clippy::cmp_owned)]             // owned comparison aceptable para edge cases
 #![allow(clippy::manual_is_ascii_check)] // char comparison manual más clara
-#![allow(clippy::consecutive_str_replace)]  // replace en cadena legible
+#![allow(clippy::collapsible_str_replace)]  // replace en cadena legible
 #![allow(clippy::io_other_error)]         // std::io::Error::other pendiente
 //!
 //! Biblioteca Rust de alto rendimiento para gestión, validación y análisis

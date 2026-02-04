@@ -309,7 +309,7 @@ impl ExportCommand {
                         e.to_string(),
                     ))
                 })?;
-                let content = std::fs::read(&path)?;
+                let content = std::fs::read(path)?;
                 zip.write_all(&content)?;
             }
         }

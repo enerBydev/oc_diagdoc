@@ -422,7 +422,7 @@ pub fn run(cmd: DepsCommand, cli: &crate::CliConfig) -> anyhow::Result<()> {
             let path = entry.path();
             if !path.is_file() { continue; }
             if path.extension().map(|e| e != "md").unwrap_or(true) { continue; }
-            if let Ok(content) = std::fs::read_to_string(&path) {
+            if let Ok(content) = std::fs::read_to_string(path) {
                 let parent_info = if let Some(cap) = parent_re.captures(&content) {
                     let parent = cap[1].trim();
                     if parent.is_empty() || parent == "null" || parent == "~" {
@@ -477,7 +477,7 @@ pub fn run(cmd: DepsCommand, cli: &crate::CliConfig) -> anyhow::Result<()> {
             if path.extension().map(|e| e != "md").unwrap_or(true) { continue; }
             let file_id = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
 
-            if let Ok(content) = std::fs::read_to_string(&path) {
+            if let Ok(content) = std::fs::read_to_string(path) {
                 // Verificar si es hijo
                 if let Some(cap) = parent_re.captures(&content) {
                     if cap[1].trim() == doc_id {

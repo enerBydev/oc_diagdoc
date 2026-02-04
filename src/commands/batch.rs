@@ -375,7 +375,7 @@ pub fn run(cmd: BatchCommand, cli: &crate::commands::CliConfig) -> anyhow::Resul
                 let path = entry.path();
                 if !path.is_file() { continue; }
                 if path.extension().map(|e| e != "md").unwrap_or(true) { continue; }
-                if let Ok(content) = std::fs::read_to_string(&path) {
+                if let Ok(content) = std::fs::read_to_string(path) {
                     // Verificar si ya tiene el campo
                     let field_pattern = format!("{}:", field);
                     if content.contains(&field_pattern) {
@@ -389,7 +389,7 @@ pub fn run(cmd: BatchCommand, cli: &crate::commands::CliConfig) -> anyhow::Resul
                                 &format!("---\n{}\n", new_line),
                                 1,
                             );
-                            let _ = std::fs::write(&path, new_content);
+                            let _ = std::fs::write(path, new_content);
                         }
                         files_modified += 1;
                     }
@@ -427,11 +427,11 @@ pub fn run(cmd: BatchCommand, cli: &crate::commands::CliConfig) -> anyhow::Resul
             let path = entry.path();
             if !path.is_file() { continue; }
             if path.extension().map(|e| e != "md").unwrap_or(true) { continue; }
-            if let Ok(content) = std::fs::read_to_string(&path) {
+            if let Ok(content) = std::fs::read_to_string(path) {
                 if field_regex.is_match(&content) {
                     if !cmd.dry_run {
                         let new_content = field_regex.replace_all(&content, "").to_string();
-                        let _ = std::fs::write(&path, new_content);
+                        let _ = std::fs::write(path, new_content);
                     }
                     files_modified += 1;
                 } else {

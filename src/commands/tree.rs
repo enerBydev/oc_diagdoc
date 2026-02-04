@@ -265,9 +265,7 @@ impl TreeResult {
         for node in &self.nodes {
             // Sanitizar ID para Mermaid (reemplazar caracteres especiales)
             let mermaid_id = node.id
-                .replace('.', "_")
-                .replace(' ', "_")
-                .replace('-', "_");
+                .replace(['.', ' ', '-'], "_");
             
             // Sanitizar título
             let safe_title = node.title
@@ -287,13 +285,9 @@ impl TreeResult {
         for node in &self.nodes {
             if let Some(ref parent_id) = node.parent_id {
                 let parent_mermaid_id = parent_id
-                    .replace('.', "_")
-                    .replace(' ', "_")
-                    .replace('-', "_");
+                    .replace(['.', ' ', '-'], "_");
                 let child_mermaid_id = node.id
-                    .replace('.', "_")
-                    .replace(' ', "_")
-                    .replace('-', "_");
+                    .replace(['.', ' ', '-'], "_");
                 
                 output.push_str(&format!(
                     "    {} --> {}\n",

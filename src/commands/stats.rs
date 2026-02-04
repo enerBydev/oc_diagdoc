@@ -400,14 +400,14 @@ pub fn run(cmd: StatsCommand, cli: &crate::CliConfig) -> anyhow::Result<()> {
 
             // Size
             if cmd.size {
-                if let Ok(meta) = std::fs::metadata(&path) {
+                if let Ok(meta) = std::fs::metadata(path) {
                     total_bytes += meta.len();
                 }
             }
 
             // Recent files
             if cmd.recent.is_some() {
-                if let Ok(meta) = std::fs::metadata(&path) {
+                if let Ok(meta) = std::fs::metadata(path) {
                     if let Ok(mtime) = meta.modified() {
                         let size = meta.len() as usize;
                         recent_files.push((path.to_path_buf(), mtime, size));
@@ -417,7 +417,7 @@ pub fn run(cmd: StatsCommand, cli: &crate::CliConfig) -> anyhow::Result<()> {
 
             // Status y Type
             if cmd.by_status || cmd.by_type {
-                if let Ok(content) = std::fs::read_to_string(&path) {
+                if let Ok(content) = std::fs::read_to_string(path) {
                     if cmd.by_status {
                         let status = StatsCommand::get_yaml_field(&content, "status")
                             .unwrap_or_else(|| "sin_status".to_string());

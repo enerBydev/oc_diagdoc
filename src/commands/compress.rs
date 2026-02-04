@@ -186,7 +186,7 @@ impl CompressCommand {
                 }
 
                 // Agregar a TOC
-                let anchor = file_id.replace('.', "-").replace(' ', "-").to_lowercase();
+                let anchor = file_id.replace(['.', ' '], "-").to_lowercase();
                 toc.push_str(&format!("- [{}](#{})\n", title, anchor));
 
                 // Agregar separador y contenido

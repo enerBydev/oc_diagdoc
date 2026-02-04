@@ -452,7 +452,7 @@ pub fn run(cmd: SyncCommand, cli: &crate::commands::CliConfig) -> anyhow::Result
             let path = entry.path();
             if !path.is_file() { continue; }
             if path.extension().map(|e| e != "md").unwrap_or(true) { continue; }
-            if let Ok(content) = std::fs::read_to_string(&path) {
+            if let Ok(content) = std::fs::read_to_string(path) {
                 if let Some(cap) = parent_re.captures(&content) {
                     let parent = cap[1].trim().to_string();
                     if parent != "null" && !parent.is_empty() {
@@ -502,7 +502,7 @@ pub fn run(cmd: SyncCommand, cli: &crate::commands::CliConfig) -> anyhow::Result
             let path = entry.path();
             if !path.is_file() { continue; }
             if path.extension().map(|e| e != "md").unwrap_or(true) { continue; }
-            if let Ok(content) = std::fs::read_to_string(&path) {
+            if let Ok(content) = std::fs::read_to_string(path) {
                 // Buscar índices
                 if let Some(cap) = type_re.captures(&content) {
                     let doc_type = cap[1].trim();

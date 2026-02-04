@@ -488,7 +488,7 @@ pub fn count_words(body: &str) -> usize {
 
         // Skip headings for word count? (optional, keeping them)
         // Skip images and links (contar solo texto)
-        let text = trimmed.replace(|c: char| c == '#' || c == '*' || c == '_' || c == '`', " ");
+        let text = trimmed.replace(['#', '*', '_', '`'], " ");
 
         word_count += text.split_whitespace().count();
     }
