@@ -25,6 +25,9 @@ pub struct TreeDisplayNode {
     pub link_count: usize,
     pub is_orphan: bool,
     pub doc_type: String, // master, module_root, branch, leaf
+    // P3: Campos para paridad con Python
+    pub children_count: usize,
+    pub parent_id: Option<String>,
 }
 
 impl TreeDisplayNode {
@@ -41,6 +44,8 @@ impl TreeDisplayNode {
             link_count: 0,
             is_orphan: false,
             doc_type: "leaf".to_string(),
+            children_count: 0,
+            parent_id: None,
         }
     }
 
@@ -53,8 +58,17 @@ impl TreeDisplayNode {
         let mut prefix = String::new();
 
         // Líneas verticales de ancestros
-        for &is_last in &self.ancestors_are_last[..self.depth.saturating_sub(1)] {
+        // P3 FIX: Usar el mínimo para evitar acceso fuera de rango cuando depth es calculado desde ID
+        let ancestor_len = self.ancestors_are_last.len();
+        let max_ancestors = self.depth.saturating_sub(1).min(ancestor_len);
+        
+        for &is_last in &self.ancestors_are_last[..max_ancestors] {
             prefix.push_str(if is_last { "    " } else { "│   " });
+        }
+        
+        // Si el depth es mayor que los ancestros disponibles, agregar espacios
+        for _ in max_ancestors..self.depth.saturating_sub(1) {
+            prefix.push_str("    ");
         }
 
         // Conexión al nodo actual
@@ -192,6 +206,104 @@ impl TreeResult {
 
         output
     }
+
+    /// P3: Renderiza como JSON.
+    pub fn render_json(&self) -> String {
+        let mut nodes_json = Vec::new();
+        
+        for node in &self.nodes {
+            let parent_id_str = match &node.parent_id {
+                Some(pid) => format!("\"{}\"", pid),
+                None => "null".to_string(),
+            };
+            
+            nodes_json.push(format!(
+                r#"    {{
+      "id": "{}",
+      "title": "{}",
+      "depth": {},
+      "doc_type": "{}",
+      "parent_id": {},
+      "children_count": {},
+      "word_count": {},
+      "is_orphan": {}
+    }}"#,
+                node.id.replace('"', "\\\""),
+                node.title.replace('"', "\\\""),
+                node.depth,
+                node.doc_type,
+                parent_id_str,
+                node.children_count,
+                node.word_count,
+                node.is_orphan
+            ));
+        }
+        
+        format!(
+            r#"{{
+  "total_nodes": {},
+  "max_depth": {},
+  "orphans_count": {},
+  "total_words": {},
+  "nodes": [
+{}
+  ]
+}}"#,
+            self.total_nodes,
+            self.max_depth,
+            self.orphans_count,
+            self.total_words,
+            nodes_json.join(",\n")
+        )
+    }
+
+    /// P3: Renderiza como diagrama Mermaid.
+    pub fn render_mermaid(&self) -> String {
+        let mut output = String::from("graph TD\n");
+        
+        // Crear nodo por cada documento
+        for node in &self.nodes {
+            // Sanitizar ID para Mermaid (reemplazar caracteres especiales)
+            let mermaid_id = node.id
+                .replace('.', "_")
+                .replace(' ', "_")
+                .replace('-', "_");
+            
+            // Sanitizar título
+            let safe_title = node.title
+                .replace('"', "'")
+                .replace('[', "(")
+                .replace(']', ")");
+            
+            output.push_str(&format!(
+                "    {}[\"{}\"]\n",
+                mermaid_id, safe_title
+            ));
+        }
+        
+        output.push('\n');
+        
+        // Crear conexiones basadas en parent_id
+        for node in &self.nodes {
+            if let Some(ref parent_id) = node.parent_id {
+                let parent_mermaid_id = parent_id
+                    .replace('.', "_")
+                    .replace(' ', "_")
+                    .replace('-', "_");
+                let child_mermaid_id = node.id
+                    .replace('.', "_")
+                    .replace(' ', "_")
+                    .replace('-', "_");
+                
+                output.push_str(&format!(
+                    "    {} --> {}\n",
+                    parent_mermaid_id, child_mermaid_id
+                ));
+            }
+        }
+        
+        output
+    }
 }
 
 impl Default for TreeResult {
@@ -262,6 +374,48 @@ pub struct TreeCommand {
     /// Guardar resultado en archivo.
     #[arg(short, long)]
     pub output: Option<PathBuf>,
+
+    // P3: Nuevas flags de paridad con Python tree_viewer.py
+    /// Mostrar tipo de documento junto a cada nodo [master, branch, leaf].
+    #[arg(long)]
+    pub show_type: bool,
+
+    /// Mostrar conteo de hijos junto a cada nodo.
+    #[arg(long)]
+    pub show_children: bool,
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// HELPER FUNCTIONS
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Calcula la profundidad absoluta de un ID basada en el número de puntos.
+/// Ej: "1.1.7.5.3" → 4 (5 partes - 1)
+fn depth_from_id(id: &str) -> usize {
+    // Extraer solo la parte numérica del ID (antes del primer espacio o letra)
+    let numeric_part: String = id
+        .chars()
+        .take_while(|c| c.is_ascii_digit() || *c == '.')
+        .collect();
+    
+    if numeric_part.is_empty() {
+        return 0;
+    }
+    
+    // Contar puntos para determinar profundidad
+    numeric_part.matches('.').count()
+}
+
+/// Calcula la profundidad relativa de un ID respecto a un root.
+/// Ej: "1.1.7.5.3" con root "1.1" → 3 (profundidad 4 - profundidad 1)
+fn depth_relative_to(id: &str, root: Option<&str>) -> usize {
+    let absolute_depth = depth_from_id(id);
+    if let Some(root_id) = root {
+        let root_depth = depth_from_id(root_id);
+        absolute_depth.saturating_sub(root_depth)
+    } else {
+        absolute_depth
+    }
 }
 
 
@@ -457,18 +611,28 @@ impl TreeCommand {
         }
 
         // Crear nodo
-        let mut node = TreeDisplayNode::new(id, &title, depth);
+        // P3 FIX: Usar profundidad relativa basada en ID cuando hay --root
+        let effective_depth = if self.root.is_some() {
+            depth_relative_to(id, self.root.as_deref())
+        } else {
+            depth
+        };
+        
+        let mut node = TreeDisplayNode::new(id, &title, effective_depth);
         node.is_last = is_last;
         node.ancestors_are_last = ancestors_are_last.clone();
         node.has_children = has_children;
         node.word_count = word_count;
         node.is_orphan = is_orphan;
         node.doc_type = doc_type;
+        // P3: Nuevos campos
+        node.children_count = children_map.get(id).map(|c| c.len()).unwrap_or(0);
+        node.parent_id = parent_id.clone();
 
-        // Emoji basado en tipo/estado
+        // Emoji basado en tipo/estado - usar effective_depth
         node.status_emoji = if is_orphan {
             "⚠️".to_string()
-        } else if depth == 0 {
+        } else if effective_depth == 0 {
             "📁".to_string()
         } else if has_children {
             "📂".to_string()
@@ -479,6 +643,16 @@ impl TreeCommand {
         // Agregar conteo de palabras en título si se pidió
         if self.words {
             node.title = format!("{} ({} words)", node.title, word_count);
+        }
+
+        // P3: Agregar tipo si se pidió --show-type
+        if self.show_type {
+            node.title = format!("{} [{}]", node.title, node.doc_type);
+        }
+
+        // P3: Agregar conteo de hijos si se pidió --show-children
+        if self.show_children && node.children_count > 0 {
+            node.title = format!("{} ({})", node.title, node.children_count);
         }
 
         result.nodes.push(node);
@@ -582,19 +756,43 @@ pub fn run(cmd: TreeCommand, cli: &crate::CliConfig) -> anyhow::Result<()> {
     let data_dir = cmd.path.as_ref().unwrap_or(&default_dir);
     let result = cmd.run(data_dir)?;
 
-    if result.nodes.is_empty() {
+    // P3 FIX: Seleccionar método de renderizado según --format
+    let output = if result.nodes.is_empty() {
         // Mostrar árbol de ejemplo si no hay proyecto
         let sample = TreeCommand::build_sample_tree();
-        println!("{}", sample.render());
+        sample.render()
     } else {
-        // L2: Seleccionar método de renderizado según flags
-        let output = if cmd.stats {
-            result.render_with_stats()
-        } else if cmd.color {
-            result.render_colored()
-        } else {
-            result.render()
-        };
+        // P3: Seleccionar formato según flag --format
+        match cmd.format.as_str() {
+            "json" => result.render_json(),
+            "mermaid" => result.render_mermaid(),
+            "md" => {
+                // Formato markdown simple
+                let mut md = String::from("# Document Tree\n\n```\n");
+                md.push_str(&result.render());
+                md.push_str("```\n");
+                md
+            }
+            _ => {
+                // Default: ASCII con stats/color según flags
+                if cmd.stats {
+                    result.render_with_stats()
+                } else if cmd.color {
+                    result.render_colored()
+                } else {
+                    result.render()
+                }
+            }
+        }
+    };
+
+    // P3 F3.7: Guardar en archivo si --output especificado
+    if let Some(ref output_path) = cmd.output {
+        std::fs::write(output_path, &output)?;
+        if !cli.quiet {
+            println!("✅ Árbol guardado en: {}", output_path.display());
+        }
+    } else {
         println!("{}", output);
     }
 
