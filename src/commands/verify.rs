@@ -216,6 +216,14 @@ pub struct VerifyCommand {
     /// P2-C1: Usar caché para verificaciones repetidas (sled).
     #[arg(long)]
     pub cache: bool,
+
+    /// RFC-04: Solo procesar archivos en la raíz del directorio (no recursivo).
+    #[arg(long)]
+    pub root_only: bool,
+
+    /// RFC-04: Patrones de exclusión. Ejemplo: --exclude "_summaries" --exclude "prompts"
+    #[arg(long, value_name = "PATTERN")]
+    pub exclude: Vec<String>,
 }
 
 /// Fases a omitir en modo quick (consumen mucho tiempo)
@@ -384,10 +392,23 @@ impl VerifyCommand {
         None
     }
 
-    /// Gets all markdown files in directory (excluding test files) - RECURSIVE with WalkDir
+    /// Gets all markdown files in directory (excluding test files) - RFC-04 enhanced
     fn get_md_files(data_dir: &PathBuf) -> Vec<PathBuf> {
+        Self::get_md_files_with_options(data_dir, false, &[])
+    }
+
+    /// RFC-04: Gets markdown files with root_only and exclude options
+    fn get_md_files_with_options(data_dir: &PathBuf, root_only: bool, excludes: &[String]) -> Vec<PathBuf> {
         use walkdir::WalkDir;
-        WalkDir::new(data_dir)
+        
+        let mut walker = WalkDir::new(data_dir);
+        
+        // RFC-04: Si root_only, limitar profundidad a 1
+        if root_only {
+            walker = walker.max_depth(1);
+        }
+        
+        walker
             .into_iter()
             .filter_map(|e| e.ok())
             .filter(|e| {
@@ -398,6 +419,13 @@ impl VerifyCommand {
                 }
                 if path.extension().map_or(true, |ext| ext != "md") {
                     return false;
+                }
+                // RFC-04: Apply exclude patterns
+                let path_str = path.to_string_lossy();
+                for pattern in excludes {
+                    if path_str.contains(pattern) {
+                        return false;
+                    }
                 }
                 // Exclude test files
                 if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
@@ -657,41 +685,35 @@ impl VerifyCommand {
         }
     }
 
-    /// Parse date string to seconds since UNIX_EPOCH
+    /// RFC-01: Parse date string to seconds since UNIX_EPOCH (timezone-aware)
     fn parse_date_to_secs(date_str: &str) -> Option<u64> {
-        // Format: "YYYY-MM-DD HH:MM" or "YYYY-MM-DD"
-        let parts: Vec<&str> = date_str.split_whitespace().collect();
-        let date_part = parts.first()?;
-        let date_components: Vec<&str> = date_part.split('-').collect();
-
-        if date_components.len() != 3 {
-            return None;
-        }
-
-        let year: u64 = date_components[0].parse().ok()?;
-        let month: u64 = date_components[1].parse().ok()?;
-        let day: u64 = date_components[2].parse().ok()?;
-
-        // Approximate calculation (not accounting for leap years, but good enough for 24h threshold)
-        let days_since_epoch = (year - 1970) * 365 + (month - 1) * 30 + day;
-        let secs_from_date = days_since_epoch * 86400;
-
-        // Add time if present
-        let time_secs = if parts.len() > 1 {
-            let time_part = parts[1];
-            let time_components: Vec<&str> = time_part.split(':').collect();
-            if time_components.len() >= 2 {
-                let hours: u64 = time_components[0].parse().unwrap_or(0);
-                let mins: u64 = time_components[1].parse().unwrap_or(0);
-                hours * 3600 + mins * 60
-            } else {
-                0
+        use chrono::{Local, NaiveDateTime, TimeZone};
+        
+        // Format: "YYYY-MM-DD HH:MM:SS" or "YYYY-MM-DD HH:MM" or "YYYY-MM-DD"
+        let cleaned = date_str.trim().trim_matches('"');
+        
+        // Try full datetime formats
+        if let Ok(naive) = NaiveDateTime::parse_from_str(cleaned, "%Y-%m-%d %H:%M:%S") {
+            if let Some(local_dt) = Local.from_local_datetime(&naive).single() {
+                return Some(local_dt.timestamp() as u64);
             }
-        } else {
-            0
-        };
-
-        Some(secs_from_date + time_secs)
+        }
+        
+        if let Ok(naive) = NaiveDateTime::parse_from_str(cleaned, "%Y-%m-%d %H:%M") {
+            if let Some(local_dt) = Local.from_local_datetime(&naive).single() {
+                return Some(local_dt.timestamp() as u64);
+            }
+        }
+        
+        // Try date-only format (assume midnight local time)
+        if let Ok(naive) = chrono::NaiveDate::parse_from_str(cleaned, "%Y-%m-%d") {
+            let naive_dt = naive.and_hms_opt(0, 0, 0)?;
+            if let Some(local_dt) = Local.from_local_datetime(&naive_dt).single() {
+                return Some(local_dt.timestamp() as u64);
+            }
+        }
+        
+        None
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -1218,6 +1240,8 @@ impl VerifyCommand {
     // ═══════════════════════════════════════════════════════════════════════
 
     fn phase_hash_integrity(&self, phase: &mut VerificationPhase, data_dir: &PathBuf) {
+        use sha2::{Digest, Sha256};
+        
         let files = Self::get_md_files(data_dir);
 
         for path in files {
@@ -1229,28 +1253,24 @@ impl VerifyCommand {
                         .and_then(|n| n.to_str())
                         .unwrap_or("unknown");
 
-                    // Compute actual hash of body content (after YAML)
-                    let body = if content.starts_with("---") {
-                        if let Some(end) = content[3..].find("---") {
-                            &content[3 + end + 3..]
-                        } else {
-                            &content
-                        }
-                    } else {
-                        &content
-                    };
+                    // RFC-06: Usar exactamente la misma lógica de hash que sync.rs
+                    // Excluir campos volátiles (last_updated, content_hash, file_create)
+                    let content_for_hash: String = content
+                        .lines()
+                        .filter(|l| {
+                            !l.starts_with("last_updated:") &&
+                            !l.starts_with("content_hash:") &&
+                            !l.starts_with("file_create:")
+                        })
+                        .collect::<Vec<_>>()
+                        .join("\n");
+                    
+                    let mut hasher = Sha256::new();
+                    hasher.update(content_for_hash.as_bytes());
+                    let computed_hex = format!("{:x}", hasher.finalize())[..16].to_string();
 
-                    // Simple checksum (djb2 hash)
-                    let computed: u64 = body.bytes().fold(5381u64, |hash, c| {
-                        hash.wrapping_mul(33).wrapping_add(c as u64)
-                    });
-                    let computed_hex = format!("{:016x}", computed);
-
-                    // Compare (allow partial match for different hash formats)
-                    if !stored_hash.starts_with(&computed_hex[..8])
-                        && !computed_hex
-                            .starts_with(&stored_hash.chars().take(8).collect::<String>())
-                    {
+                    // Compare stored vs computed
+                    if stored_hash.trim().trim_matches('"') != computed_hex {
                         phase.add_warning(format!("{}: Hash mismatch (stored vs computed)", name));
                     }
                 }

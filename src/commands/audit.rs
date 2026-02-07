@@ -233,6 +233,7 @@ impl AuditCommand {
             rule: None,
             summary: false,
             show_fixes: false,
+            explain: None,  // RFC-03
         };
         if let Ok(lint_result) = lint_cmd.run(data_dir) {
             // Finding: Errores de lint

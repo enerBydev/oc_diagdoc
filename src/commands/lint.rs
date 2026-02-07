@@ -140,12 +140,22 @@ pub struct LintCommand {
     /// P3-A3: Mostrar detalle de todos los fixes aplicables.
     #[arg(long)]
     pub show_fixes: bool,
+
+    /// RFC-03: Explicar regla de lint (ej: --explain L006).
+    #[arg(long, value_name = "CODE")]
+    pub explain: Option<String>,
 }
 
 impl LintCommand {
     pub fn run(&self, data_dir: &std::path::Path) -> OcResult<LintResult> {
         use crate::core::files::{get_all_md_files, read_file_content, ScanOptions};
         use std::collections::HashSet;
+
+        // RFC-03: Si se pidió --explain, mostrar documentación y salir
+        if let Some(code) = &self.explain {
+            crate::core::lint_docs::print_rule_explanation(code);
+            return Ok(LintResult::new());
+        }
 
         let mut result = LintResult::new();
         let mut files_fixed = 0usize;
@@ -346,18 +356,37 @@ impl LintCommand {
     }
 
     /// Regla: Code blocks deben tener lenguaje especificado.
+    /// RFC-28: Fixed bug - ahora distingue aperturas vs cierres de code blocks
     fn rule_code_block_language(&self, file_path: &PathBuf, lines: &[&str]) -> Vec<LintIssue> {
         let mut issues = Vec::new();
+        let mut in_code_block = false;
+
         for (idx, line) in lines.iter().enumerate() {
-            if line.trim() == "```" {
-                issues.push(LintIssue {
-                    code: "L006".to_string(),
-                    message: "Code block sin lenguaje especificado".to_string(),
-                    file: file_path.clone(),
-                    line: Some(idx + 1),
-                    severity: LintSeverity::Hint,
-                    fixable: false,
-                });
+            let trimmed = line.trim();
+            
+            // Detectar líneas que empiezan con ```
+            if trimmed.starts_with("```") {
+                if !in_code_block {
+                    // APERTURA de code block
+                    in_code_block = true;
+                    
+                    // Verificar si tiene lenguaje especificado después de ```
+                    let after_backticks = trimmed.trim_start_matches('`');
+                    if after_backticks.is_empty() {
+                        // Solo "```" sin lenguaje = problema real
+                        issues.push(LintIssue {
+                            code: "L006".to_string(),
+                            message: "Code block sin lenguaje especificado".to_string(),
+                            file: file_path.clone(),
+                            line: Some(idx + 1),
+                            severity: LintSeverity::Hint,
+                            fixable: false,
+                        });
+                    }
+                } else {
+                    // CIERRE de code block - NO reportar L006
+                    in_code_block = false;
+                }
             }
         }
         issues

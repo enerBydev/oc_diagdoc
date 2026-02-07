@@ -38,6 +38,48 @@ pub fn compute_multi_file_hash(paths: &[PathBuf]) -> OcResult<ContentHash> {
     Ok(ContentHash::from_string(hex::encode(result)))
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// RFC-06: HASH EXCLUYENDO CAMPOS VOLÁTILES
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// RFC-06: Calcula hash excluyendo campos volátiles específicos.
+/// Esto evita el ciclo infinito donde last_updated invalida el hash.
+/// Compatible con la lógica de sync.rs.
+pub fn compute_hash_excluding_volatile(content: &str) -> ContentHash {
+    let filtered: String = content
+        .lines()
+        .filter(|l| {
+            let trimmed = l.trim();
+            !trimmed.starts_with("last_updated:") &&
+            !trimmed.starts_with("content_hash:") &&
+            !trimmed.starts_with("file_create:")
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    ContentHash::compute(&filtered)
+}
+
+/// RFC-06: Calcula hash solo del body (excluyendo frontmatter YAML).
+pub fn compute_body_hash(content: &str) -> ContentHash {
+    let body = extract_body_content(content);
+    ContentHash::compute(&body)
+}
+
+/// RFC-06: Extrae contenido después del frontmatter YAML (después del segundo ---).
+fn extract_body_content(content: &str) -> String {
+    // Buscar el fin del frontmatter (segundo ---)
+    if content.starts_with("---") {
+        if let Some(end_pos) = content[3..].find("\n---") {
+            let body_start = end_pos + 3 + 4; // +3 por el offset, +4 por "\n---"
+            if body_start < content.len() {
+                return content[body_start..].trim().to_string();
+            }
+        }
+    }
+    // Sin frontmatter, retornar todo
+    content.to_string()
+}
+
 /// Entrada en el cache de hashes.
 #[derive(Debug, Clone)]
 struct HashCacheEntry {
@@ -257,5 +299,62 @@ mod tests {
         // Hash diferente
         let wrong_hash = compute_content_hash("Different content");
         assert!(!verify_content_hash(&file_path, &wrong_hash).unwrap());
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // RFC-06: Tests para funciones de hash excluyendo volátiles
+    // ═══════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn test_compute_hash_excluding_volatile() {
+        let content1 = "---\nlast_updated: 2026-01-01\ncontent_hash: abc123\n---\n# Title\nBody content";
+        let content2 = "---\nlast_updated: 2026-12-31\ncontent_hash: xyz789\n---\n# Title\nBody content";
+        
+        let hash1 = compute_hash_excluding_volatile(content1);
+        let hash2 = compute_hash_excluding_volatile(content2);
+        
+        // Hashes deben ser iguales porque solo difieren en campos volátiles
+        assert_eq!(hash1, hash2);
+    }
+
+    #[test]
+    fn test_compute_hash_excluding_volatile_detects_real_changes() {
+        let content1 = "---\nlast_updated: 2026-01-01\n---\n# Title\nBody content";
+        let content2 = "---\nlast_updated: 2026-01-01\n---\n# Title\nBody content CHANGED";
+        
+        let hash1 = compute_hash_excluding_volatile(content1);
+        let hash2 = compute_hash_excluding_volatile(content2);
+        
+        // Hashes deben ser diferentes porque el body cambió
+        assert_ne!(hash1, hash2);
+    }
+
+    #[test]
+    fn test_extract_body_content() {
+        let content = "---\ntitle: Test\ndate: 2026-01-01\n---\n# Main Title\n\nBody paragraph.";
+        let body = extract_body_content(content);
+        
+        assert!(body.starts_with("# Main Title"));
+        assert!(!body.contains("title: Test"));
+    }
+
+    #[test]
+    fn test_extract_body_content_no_frontmatter() {
+        let content = "# Just a title\n\nNo frontmatter here.";
+        let body = extract_body_content(content);
+        
+        assert_eq!(body, content);
+    }
+
+    #[test]
+    fn test_compute_body_hash() {
+        let content1 = "---\ntitle: A\n---\n# Same body";
+        let content2 = "---\ntitle: B\n---\n# Same body";
+        
+        let hash1 = compute_body_hash(content1);
+        let hash2 = compute_body_hash(content2);
+        
+        // Hashes deben ser iguales porque el body es igual
+        assert_eq!(hash1, hash2);
     }
 }

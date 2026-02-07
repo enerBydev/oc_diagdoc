@@ -208,6 +208,8 @@ impl WatchCommand {
             quick: true, // F1.4: usar modo quick en watch para rapidez
             progress: false,
             cache: false,
+            root_only: false,  // RFC-04
+            exclude: vec![],   // RFC-04
         };
 
         if let Ok(result) = verify_cmd.run(&data_dir_buf) {

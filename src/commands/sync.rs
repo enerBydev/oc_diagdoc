@@ -267,11 +267,19 @@ impl SyncCommand {
                 // L15.3: Regenerar hashes
                 if !self.dates_only {
                     use sha2::{Digest, Sha256};
-                    let content_for_hash = content
+                    
+                    // RFC-06: Usar exactamente la misma lógica de hash que verify.rs
+                    // Excluir campos volátiles (last_updated, content_hash, file_create)
+                    let content_for_hash: String = content
                         .lines()
-                        .skip_while(|l| l.starts_with("---") || l.contains(':') || l.is_empty())
+                        .filter(|l| {
+                            !l.starts_with("last_updated:") &&
+                            !l.starts_with("content_hash:") &&
+                            !l.starts_with("file_create:")
+                        })
                         .collect::<Vec<_>>()
                         .join("\n");
+                    
                     let mut hasher = Sha256::new();
                     hasher.update(content_for_hash.as_bytes());
                     let new_hash = format!("{:x}", hasher.finalize())[..16].to_string();

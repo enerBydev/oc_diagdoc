@@ -13,6 +13,7 @@ pub mod verify;
 
 // Comandos de modificación
 pub mod batch;
+pub mod fix;  // RFC-07
 pub mod links;
 pub mod sync;
 
@@ -57,6 +58,7 @@ pub enum Command {
 
     // Modificación
     Batch(batch::BatchCommand),
+    Fix(fix::FixCommand),  // RFC-07
     Sync(sync::SyncCommand),
     Links(links::LinksCommand),
 
@@ -99,6 +101,7 @@ pub fn execute(cmd: Command, cli: &CliConfig) -> anyhow::Result<()> {
         Command::Deps(args) => deps::run(args, cli),
         Command::Tree(args) => tree::run(args, cli),
         Command::Batch(args) => batch::run(args, cli),
+        Command::Fix(args) => fix::run(args, cli),  // RFC-07
         Command::Sync(args) => sync::run(args, cli),
         Command::Links(args) => links::run(args, cli),
         Command::Lint(args) => lint::run(args, cli),

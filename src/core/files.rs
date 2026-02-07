@@ -22,6 +22,8 @@ pub struct ScanOptions {
     pub follow_symlinks: bool,
     /// Incluir archivos ocultos.
     pub include_hidden: bool,
+    /// RFC-04: Solo procesar archivos en la raíz (no recursivo).
+    pub root_only: bool,
 }
 
 impl ScanOptions {
@@ -41,6 +43,12 @@ impl ScanOptions {
 
     pub fn with_hidden(mut self, include: bool) -> Self {
         self.include_hidden = include;
+        self
+    }
+
+    /// RFC-04: Configura modo root-only (solo archivos en directorio raíz).
+    pub fn with_root_only(mut self, root_only: bool) -> Self {
+        self.root_only = root_only;
         self
     }
 }
@@ -68,7 +76,10 @@ pub fn get_all_md_files(dir: impl AsRef<Path>, options: &ScanOptions) -> OcResul
 
     let mut walker = WalkDir::new(dir).follow_links(options.follow_symlinks);
 
-    if options.max_depth > 0 {
+    // RFC-04: Si root_only, limitar profundidad a 1 (solo archivos directos)
+    if options.root_only {
+        walker = walker.max_depth(1);
+    } else if options.max_depth > 0 {
         walker = walker.max_depth(options.max_depth);
     }
 

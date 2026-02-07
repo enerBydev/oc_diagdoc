@@ -34,9 +34,11 @@ pub mod cli;
 pub mod config;
 pub mod docs;
 pub mod files;
+pub mod fix_router;  // RFC-02
 pub mod graph;
 pub mod hash;
 pub mod links;
+pub mod lint_docs;   // RFC-03
 pub mod loader;
 pub mod patterns;
 pub mod pipeline;
