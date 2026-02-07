@@ -182,8 +182,10 @@ impl LinksCommand {
                     for cap in wiki_link.captures_iter(line) {
                         let target = &cap[1];
 
-                        // Detectar si tiene path (contiene /) - esto es no-estándar
-                        let has_path = target.contains('/');
+                        // RFC-28 FIX: Detectar path solo en la parte del nombre (antes del |)
+                        // [[archivo|alias con / permitido]] no debe ser no-estándar
+                        let file_part = target.split('|').next().unwrap_or(target);
+                        let has_path = file_part.contains('/');
 
                         // Extraer nombre normalizado (sin path, sin alias, sin anchor)
                         let normalized_name = target
