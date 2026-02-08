@@ -181,7 +181,7 @@ impl LintCommand {
                     }
                 }
 
-                let issues = self.lint_file(file_path, &content);
+                let issues = self.lint_file(file_path, &content, data_dir);
 
                 if !issues.is_empty() {
                     files_with_issues_set.insert(file_path.clone());
@@ -206,7 +206,7 @@ impl LintCommand {
     }
 
     /// Aplica todas las reglas a un archivo.
-    fn lint_file(&self, file_path: &PathBuf, content: &str) -> Vec<LintIssue> {
+    fn lint_file(&self, file_path: &PathBuf, content: &str, data_dir: &std::path::Path) -> Vec<LintIssue> {
         let mut issues = Vec::new();
         let lines: Vec<&str> = content.lines().collect();
 
@@ -272,7 +272,7 @@ impl LintCommand {
 
         // L013: Nietos count mismatch
         if self.should_run_rule("L013") {
-            issues.extend(self.rule_nietos_mismatch(file_path, &lines, content));
+            issues.extend(self.rule_nietos_mismatch(file_path, &lines, data_dir));
         }
 
         // L014: Wikilinks con paths absolutos
@@ -629,8 +629,8 @@ impl LintCommand {
     }
 
     /// L013: Detecta columna Nietos con valor incorrecto.
-    /// Compara el valor en la tabla con descendants_count del archivo enlazado.
-    fn rule_nietos_mismatch(&self, file_path: &PathBuf, lines: &[&str], content: &str) -> Vec<LintIssue> {
+    /// Compara el valor en la tabla con el conteo real de archivos descendientes.
+    fn rule_nietos_mismatch(&self, file_path: &PathBuf, lines: &[&str], data_dir: &std::path::Path) -> Vec<LintIssue> {
         use regex::Regex;
         lazy_static::lazy_static! {
             // Detectar tablas con columna Nietos
@@ -670,15 +670,28 @@ impl LintCommand {
                     if cols.len() > nietos_col_idx {
                         let nietos_str = cols[nietos_col_idx].trim().replace("§PIPE§", r"\|");
                         
-                        // Verificar si Nietos = 0 (potencial problema)
-                        if nietos_str == "0" {
-                            // Extraer wikilink de la primera columna
-                            let id_col = cols.get(1).unwrap_or(&"");
-                            if let Some(cap) = WIKILINK.captures(id_col) {
-                                let link_target = cap.get(1).unwrap().as_str();
+                        // Extraer wikilink de la primera columna
+                        let id_col = cols.get(1).unwrap_or(&"");
+                        if let Some(cap) = WIKILINK.captures(id_col) {
+                            let link_target_raw = cap.get(1).unwrap().as_str();
+                            // Limpiar §PIPE§ y obtener solo el nombre del archivo
+                            let link_target_clean = link_target_raw.replace("§PIPE§", "|");
+                            let link_target = link_target_clean.split('|').next().unwrap_or(link_target_raw);
+                            
+                            // FIX L013: Extraer ID numérico (e.g., "3.1.7" de "3.1.7 sistema_costos")
+                            let child_id = link_target.split(' ').next().unwrap_or(link_target).trim_end_matches('.');
+                            
+                            // Contar descendientes reales en filesystem
+                            let actual_count = self.count_descendants(data_dir, child_id);
+                            
+                            // Parsear valor reclamado en la tabla
+                            let claimed: usize = nietos_str.parse().unwrap_or(0);
+                            
+                            // Solo reportar si hay discrepancia REAL
+                            if actual_count != claimed {
                                 issues.push(LintIssue {
                                     code: "L013".to_string(),
-                                    message: format!("Nietos=0 potencialmente incorrecto para {}", link_target),
+                                    message: format!("Nietos={} incorrecto (real={}) para {}", claimed, actual_count, link_target),
                                     file: file_path.clone(),
                                     line: Some(row_idx + 1),
                                     severity: LintSeverity::Warning,
@@ -692,6 +705,25 @@ impl LintCommand {
             }
         }
         issues
+    }
+    
+    /// Helper: Cuenta archivos que inician con el prefijo dado
+    fn count_descendants(&self, data_dir: &std::path::Path, prefix: &str) -> usize {
+        use std::fs;
+        
+        let pattern = format!("{}.", prefix); // e.g., "3.1.7." para buscar "3.1.7.*"
+        
+        if let Ok(entries) = fs::read_dir(data_dir) {
+            entries
+                .filter_map(|e| e.ok())
+                .filter(|e| {
+                    let name = e.file_name().to_string_lossy().to_string();
+                    name.starts_with(&pattern) && name.ends_with(".md")
+                })
+                .count()
+        } else {
+            0
+        }
     }
 
     /// L014: Detecta wikilinks con paths absolutos.
