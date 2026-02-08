@@ -286,19 +286,21 @@ impl LinksCommand {
             }
         }
 
-        let target_name = target.split('/').next_back().unwrap_or(target);
-        // FIX #31: Normalizar escaped pipes antes del split
-        let target_name = target_name.replace("\\|", "|");
-        // Remover pipe alias [[doc|alias]] -> doc
-        let target_name = target_name.split('|').next().unwrap_or(&target_name);
-        // FP-02 FIX: Remover fragmento anchor [[doc#section]] -> doc
+        // FIX FP-03: Reordenar operaciones - primero quitar alias, luego path
+        // Paso 1: Normalizar escaped pipes
+        let target_clean = target.replace("\\|", "|");
+        // Paso 2: Quitar alias PRIMERO [[doc|alias con / permitido]] -> doc
+        let target_clean = target_clean.split('|').next().unwrap_or(&target_clean);
+        // Paso 3: Quitar path si existe [[path/doc]] -> doc
+        let target_name = target_clean.split('/').next_back().unwrap_or(target_clean);
+        // Paso 4: Quitar anchor [[doc#section]] -> doc
         let target_name = target_name.split('#').next().unwrap_or(target_name).trim();
 
-        // Intentar resolver el path
-        let resolved = if target.starts_with('/') {
-            data_dir.join(&target[1..])
+        // Intentar resolver el path usando nombre limpio
+        let resolved = if target_name.starts_with('/') {
+            data_dir.join(&target_name[1..])
         } else {
-            source.parent().unwrap_or(data_dir).join(target)
+            source.parent().unwrap_or(data_dir).join(target_name)
         };
 
         // Verificar si existe directamente
