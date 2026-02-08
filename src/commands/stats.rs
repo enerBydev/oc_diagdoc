@@ -190,20 +190,55 @@ impl StatsCommand {
                 }
 
                 // Count links and check if broken
-                for cap in link_re.captures_iter(&content) {
-                    if let Some(m) = cap.get(1) {
-                        let link = m.as_str().trim().trim_end_matches('\\');
-                        if !link.is_empty() && !link.starts_with("http") && !link.starts_with('#') {
-                            total_links += 1;
+                // FIX BUG 1: Ignorar code blocks (sincronizado con links.rs)
+                let mut in_code_block = false;
+                for line in content.lines() {
+                    let trimmed = line.trim_start();
+                    if trimmed.starts_with("```") || trimmed.starts_with("~~~") {
+                        in_code_block = !in_code_block;
+                        continue;
+                    }
+                    if in_code_block {
+                        continue;
+                    }
+                    
+                    for cap in link_re.captures_iter(line) {
+                        if let Some(m) = cap.get(1) {
+                            let link_raw = m.as_str().trim().trim_end_matches('\\');
+                            if !link_raw.is_empty() && !link_raw.starts_with("http") && !link_raw.starts_with('#') {
+                                total_links += 1;
 
-                            let link_file = if link.contains('#') {
-                                link.split('#').next().unwrap_or(link)
-                            } else {
-                                link
-                            };
+                                // FIX BUG 4: Normalizar escaped pipes
+                                let link_clean = link_raw.replace("\\|", "|");
+                                
+                                // FIX BUG 3: Extraer nombre sin alias
+                                let link_no_alias = link_clean.split('|').next().unwrap_or(&link_clean);
+                                
+                                // FIX BUG 2: Extraer nombre sin path
+                                let link_no_path = link_no_alias.split('/').next_back().unwrap_or(link_no_alias);
+                                
+                                // Quitar anchor
+                                let link_file = link_no_path.split('#').next().unwrap_or(link_no_path).trim();
+                                
+                                // FIX BUG 5: Usar fuzzy matching (sincronizado con links.rs)
+                                let link_lower = link_file.to_lowercase();
+                                let mut found = file_map.contains(&link_lower);
+                                
+                                if !found {
+                                    // Fuzzy: match parcial (archivo termina con target o comienza con target)
+                                    for file_name in &file_map {
+                                        if file_name.ends_with(&link_lower) 
+                                            || file_name.starts_with(&link_lower)
+                                            || file_name.contains(&link_lower) {
+                                            found = true;
+                                            break;
+                                        }
+                                    }
+                                }
 
-                            if !file_map.contains(&link_file.to_lowercase()) {
-                                broken_links += 1;
+                                if !found {
+                                    broken_links += 1;
+                                }
                             }
                         }
                     }
