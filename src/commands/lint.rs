@@ -309,9 +309,23 @@ impl LintCommand {
     fn rule_header_hierarchy(&self, file_path: &PathBuf, lines: &[&str]) -> Vec<LintIssue> {
         let mut issues = Vec::new();
         let mut last_level = 0;
+        let mut in_code_block = false;  // FIX BUG L002: Agregar tracking de code blocks
 
         for (idx, line) in lines.iter().enumerate() {
-            if line.starts_with('#') && !line.starts_with("```") {
+            let trimmed = line.trim_start();
+            
+            // FIX BUG L002: Detectar inicio/fin de code blocks
+            if trimmed.starts_with("```") || trimmed.starts_with("~~~") {
+                in_code_block = !in_code_block;
+                continue;
+            }
+            
+            // FIX BUG L002: Skip líneas dentro de code blocks
+            if in_code_block {
+                continue;
+            }
+
+            if line.starts_with('#') {
                 let level = line.chars().take_while(|c| *c == '#').count();
 
                 // No debe saltar más de 1 nivel
@@ -489,8 +503,25 @@ impl LintCommand {
 
         let mut issues = Vec::new();
         let mut i = 0;
+        let mut in_code_block = false;  // FIX BUG L009: Agregar tracking de code blocks
+
         while i < lines.len() {
-            if table_row.is_match(lines[i].trim()) {
+            let trimmed = lines[i].trim();
+            
+            // FIX BUG L009: Detectar inicio/fin de code blocks
+            if trimmed.starts_with("```") || trimmed.starts_with("~~~") {
+                in_code_block = !in_code_block;
+                i += 1;
+                continue;
+            }
+            
+            // FIX BUG L009: Skip líneas dentro de code blocks
+            if in_code_block {
+                i += 1;
+                continue;
+            }
+
+            if table_row.is_match(trimmed) {
                 // Verificar que la siguiente línea sea separador
                 if i + 1 >= lines.len() || !separator_row.is_match(lines[i + 1].trim()) {
                     issues.push(LintIssue {
