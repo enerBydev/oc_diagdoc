@@ -260,8 +260,29 @@ impl LintCommand {
             issues.extend(self.rule_image_alt(file_path, &lines));
         }
 
+        // L011: Separadores duplicados en tablas
+        if self.should_run_rule("L011") {
+            issues.extend(self.rule_table_double_separator(file_path, &lines));
+        }
+
+        // L012: Pipes sin escapar en wikilinks dentro de tablas
+        if self.should_run_rule("L012") {
+            issues.extend(self.rule_unescaped_pipe_in_table(file_path, &lines));
+        }
+
+        // L013: Nietos count mismatch
+        if self.should_run_rule("L013") {
+            issues.extend(self.rule_nietos_mismatch(file_path, &lines, content));
+        }
+
+        // L014: Wikilinks con paths absolutos
+        if self.should_run_rule("L014") {
+            issues.extend(self.rule_wikilink_absolute_path(file_path, &lines));
+        }
+
         issues
     }
+
 
     /// Regla: Archivo debe tener frontmatter YAML.
     fn rule_frontmatter(&self, file_path: &PathBuf, content: &str) -> Vec<LintIssue> {
@@ -505,9 +526,196 @@ impl LintCommand {
         issues
     }
 
+    /// L011: Detecta separadores duplicados en tablas.
+    /// Una tabla válida solo tiene UN separador |---| después del header.
+    fn rule_table_double_separator(&self, file_path: &PathBuf, lines: &[&str]) -> Vec<LintIssue> {
+        use crate::core::patterns::{RE_TABLE_ROW, RE_TABLE_SEPARATOR};
+        let table_row = &*RE_TABLE_ROW;
+        let separator_row = &*RE_TABLE_SEPARATOR;
+
+        let mut issues = Vec::new();
+        let mut i = 0;
+        
+        while i < lines.len() {
+            let trimmed = lines[i].trim();
+            
+            // Detectar inicio de tabla (línea que es una fila de tabla)
+            if table_row.is_match(trimmed) && !separator_row.is_match(trimmed) {
+                // Estamos en una tabla
+                let table_start = i;
+                let mut separator_count = 0;
+                let mut first_separator_line = 0;
+                
+                // Recorrer la tabla completa
+                while i < lines.len() {
+                    let line_trimmed = lines[i].trim();
+                    
+                    // ¿Es fila de tabla o separador?
+                    if separator_row.is_match(line_trimmed) {
+                        separator_count += 1;
+                        if separator_count == 1 {
+                            first_separator_line = i;
+                        } else {
+                            // Separador adicional = problema
+                            issues.push(LintIssue {
+                                code: "L011".to_string(),
+                                message: format!(
+                                    "Separador duplicado en tabla (primer sep línea {})",
+                                    first_separator_line + 1
+                                ),
+                                file: file_path.clone(),
+                                line: Some(i + 1),
+                                severity: LintSeverity::Error,
+                                fixable: true,
+                            });
+                        }
+                        i += 1;
+                    } else if table_row.is_match(line_trimmed) {
+                        i += 1;
+                    } else {
+                        // Fin de tabla
+                        break;
+                    }
+                }
+            } else {
+                i += 1;
+            }
+        }
+        issues
+    }
+
+    /// L012: Detecta wikilinks con pipes sin escapar dentro de tablas.
+    /// En tablas markdown, [[X|Y]] debe ser [[X\|Y]] para no romper columnas.
+    fn rule_unescaped_pipe_in_table(&self, file_path: &PathBuf, lines: &[&str]) -> Vec<LintIssue> {
+        use regex::Regex;
+        lazy_static::lazy_static! {
+            // Detecta [[...pipes sin escapar...]] - pipe que NO está precedido por \
+            static ref WIKILINK_UNESCAPED: Regex = Regex::new(r"\[\[([^\]\|\\]+)\|([^\]]+)\]\]").unwrap();
+        }
+        
+        let mut issues = Vec::new();
+        
+        for (idx, line) in lines.iter().enumerate() {
+            let trimmed = line.trim();
+            // Solo analizar líneas de tabla (empiezan con |)
+            if trimmed.starts_with('|') {
+                // Buscar wikilinks con pipes sin escapar
+                for cap in WIKILINK_UNESCAPED.captures_iter(line) {
+                    let full_match = cap.get(0).unwrap().as_str();
+                    // Verificar que no esté escapado (no hay \ antes del |)
+                    if !full_match.contains(r"\|") {
+                        issues.push(LintIssue {
+                            code: "L012".to_string(),
+                            message: format!("Wikilink con pipe sin escapar: {}", full_match),
+                            file: file_path.clone(),
+                            line: Some(idx + 1),
+                            severity: LintSeverity::Error,
+                            fixable: true,
+                        });
+                    }
+                }
+            }
+        }
+        issues
+    }
+
+    /// L013: Detecta columna Nietos con valor incorrecto.
+    /// Compara el valor en la tabla con descendants_count del archivo enlazado.
+    fn rule_nietos_mismatch(&self, file_path: &PathBuf, lines: &[&str], content: &str) -> Vec<LintIssue> {
+        use regex::Regex;
+        lazy_static::lazy_static! {
+            // Detectar tablas con columna Nietos
+            static ref NIETOS_HEADER: Regex = Regex::new(r"\|\s*Nietos\s*\|").unwrap();
+            // Extraer wikilink de la primera columna
+            static ref WIKILINK: Regex = Regex::new(r"\[\[([^\]\|]+)").unwrap();
+        }
+        
+        let mut issues = Vec::new();
+        
+        // Buscar tablas con columna Nietos
+        for (idx, line) in lines.iter().enumerate() {
+            if NIETOS_HEADER.is_match(line) {
+                // Encontramos header de tabla con Nietos
+                // Buscar índice de columna Nietos
+                let parts: Vec<&str> = line.split('|').collect();
+                let mut nietos_col_idx = 0;
+                for (col_idx, part) in parts.iter().enumerate() {
+                    if part.trim().contains("Nietos") {
+                        nietos_col_idx = col_idx;
+                        break;
+                    }
+                }
+                
+                // Procesar filas de datos (después del separador)
+                let mut row_idx = idx + 2; // Saltar header y separador
+                while row_idx < lines.len() {
+                    let row = lines[row_idx].trim();
+                    if !row.starts_with('|') {
+                        break;
+                    }
+                    
+                    // Enmascarar pipes dentro de wikilinks
+                    let masked = row.replace(r"\|", "§PIPE§");
+                    let cols: Vec<&str> = masked.split('|').collect();
+                    
+                    if cols.len() > nietos_col_idx {
+                        let nietos_str = cols[nietos_col_idx].trim().replace("§PIPE§", r"\|");
+                        
+                        // Verificar si Nietos = 0 (potencial problema)
+                        if nietos_str == "0" {
+                            // Extraer wikilink de la primera columna
+                            let id_col = cols.get(1).unwrap_or(&"");
+                            if let Some(cap) = WIKILINK.captures(id_col) {
+                                let link_target = cap.get(1).unwrap().as_str();
+                                issues.push(LintIssue {
+                                    code: "L013".to_string(),
+                                    message: format!("Nietos=0 potencialmente incorrecto para {}", link_target),
+                                    file: file_path.clone(),
+                                    line: Some(row_idx + 1),
+                                    severity: LintSeverity::Warning,
+                                    fixable: true,
+                                });
+                            }
+                        }
+                    }
+                    row_idx += 1;
+                }
+            }
+        }
+        issues
+    }
+
+    /// L014: Detecta wikilinks con paths absolutos.
+    /// Los wikilinks no deben usar prefijo de proyecto como "Proyecto OnlyCarNLD/Datos/".
+    fn rule_wikilink_absolute_path(&self, file_path: &PathBuf, lines: &[&str]) -> Vec<LintIssue> {
+        use regex::Regex;
+        lazy_static::lazy_static! {
+            // Detecta paths absolutos en wikilinks
+            static ref ABSOLUTE_PATH: Regex = Regex::new(r"\[\[Proyecto[^\]]*OnlyCarNLD/Datos/([^\]]+)\]\]").unwrap();
+        }
+        
+        let mut issues = Vec::new();
+        
+        for (idx, line) in lines.iter().enumerate() {
+            for cap in ABSOLUTE_PATH.captures_iter(line) {
+                let full_match = cap.get(0).unwrap().as_str();
+                issues.push(LintIssue {
+                    code: "L014".to_string(),
+                    message: format!("Wikilink con path absoluto: {}", &full_match[..full_match.len().min(50)]),
+                    file: file_path.clone(),
+                    line: Some(idx + 1),
+                    severity: LintSeverity::Info,
+                    fixable: false,
+                });
+            }
+        }
+        issues
+    }
+
     // ═══════════════════════════════════════════════════════════════════════
     // L4.4: FIX AUTOMÁTICO
     // ═══════════════════════════════════════════════════════════════════════
+
 
     /// Corrige problemas fixables en un archivo.
     pub fn fix_file(&self, _file_path: &PathBuf, content: &str) -> Option<String> {

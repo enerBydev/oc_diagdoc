@@ -131,8 +131,53 @@ pub fn get_all_rules() -> HashMap<&'static str, LintRuleDoc> {
         suggestion: "Agregar descripción dentro de los corchetes: ![descripción](url).",
     });
     
+    rules.insert("L011", LintRuleDoc {
+        code: "L011",
+        name: "Table Double Separator",
+        description: "Las tablas solo deben tener UN separador |---| después del header, no después de cada fila.",
+        impact: "❌ Alto - Tablas corruptas no se renderizan correctamente.",
+        example_bad: "| Col1 | Col2 |\\n|---|---|\\n| dato1 | dato2 |\\n|---|---|",
+        example_good: "| Col1 | Col2 |\\n|---|---|\\n| dato1 | dato2 |\\n| dato3 | dato4 |",
+        auto_fixable: true,
+        suggestion: "Ejecutar: oc_diagdoc lint --fix --rule L011",
+    });
+    
+    rules.insert("L012", LintRuleDoc {
+        code: "L012",
+        name: "Unescaped Pipe in Table Wikilink",
+        description: "Los wikilinks dentro de tablas deben escapar el pipe: [[X\\|Y]] no [[X|Y]].",
+        impact: "❌ Alto - El pipe sin escapar rompe la estructura de columnas de la tabla.",
+        example_bad: "| [[1.1. identidad|1.1]] | Detalle |",
+        example_good: "| [[1.1. identidad\\|1.1]] | Detalle |",
+        auto_fixable: true,
+        suggestion: "Ejecutar: oc_diagdoc lint --fix --rule L012",
+    });
+    
+    rules.insert("L013", LintRuleDoc {
+        code: "L013",
+        name: "Nietos Count Mismatch",
+        description: "La columna Nietos debe coincidir con descendants_count del archivo enlazado.",
+        impact: "⚠️ Medio - Información de jerarquía incorrecta en tablas de navegación.",
+        example_bad: "| [[1.1. identidad\\|1.1]] | ... | 0 |",
+        example_good: "| [[1.1. identidad\\|1.1]] | ... | 23 |",
+        auto_fixable: true,
+        suggestion: "Ejecutar: oc_diagdoc lint --fix --rule L013",
+    });
+    
+    rules.insert("L014", LintRuleDoc {
+        code: "L014",
+        name: "Wikilink Absolute Path",
+        description: "Los wikilinks no deben usar paths absolutos con prefijo de proyecto.",
+        impact: "ℹ️ Bajo - Afecta portabilidad y legibilidad.",
+        example_bad: "[[Proyecto OnlyCarNLD/Datos/1.1. identidad]]",
+        example_good: "[[1.1. identidad]]",
+        auto_fixable: false,
+        suggestion: "Revisar manualmente y usar paths relativos.",
+    });
+    
     rules
 }
+
 
 /// Obtiene documentación de una regla específica.
 pub fn get_rule_doc(code: &str) -> Option<LintRuleDoc> {
@@ -167,7 +212,7 @@ pub fn print_rule_explanation(code: &str) {
         println!();
     } else {
         eprintln!("❌ Regla '{}' no encontrada.", code);
-        eprintln!("   Reglas válidas: L001, L002, L003, L004, L005, L006, L007, L008, L009, L010");
+        eprintln!("   Reglas válidas: L001-L014");
     }
 }
 
@@ -178,9 +223,14 @@ mod tests {
     #[test]
     fn test_get_all_rules() {
         let rules = get_all_rules();
-        assert_eq!(rules.len(), 10);
+        assert_eq!(rules.len(), 14);
         assert!(rules.contains_key("L006"));
+        assert!(rules.contains_key("L011"));
+        assert!(rules.contains_key("L012"));
+        assert!(rules.contains_key("L013"));
+        assert!(rules.contains_key("L014"));
     }
+
     
     #[test]
     fn test_get_rule_doc() {
