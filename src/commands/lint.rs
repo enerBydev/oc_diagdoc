@@ -286,6 +286,12 @@ impl LintCommand {
 
     /// Regla: Archivo debe tener frontmatter YAML.
     fn rule_frontmatter(&self, file_path: &PathBuf, content: &str) -> Vec<LintIssue> {
+        // FIX #32: Excluir archivos en _summaries/ (no requieren frontmatter)
+        let path_str = file_path.to_string_lossy();
+        if path_str.contains("_summaries/") || path_str.contains("_summaries\\") {
+            return Vec::new();
+        }
+
         if !content.starts_with("---") {
             return vec![LintIssue {
                 code: "L001".to_string(),
@@ -360,12 +366,15 @@ impl LintCommand {
 
     /// Regla: Líneas no muy largas.
     fn rule_line_length(&self, file_path: &PathBuf, lines: &[&str]) -> Vec<LintIssue> {
+        // FIX #33: Aumentar umbral de 300 a 800 chars
+        const MAX_LINE_LENGTH: usize = 800;
+        
         let mut issues = Vec::new();
         for (idx, line) in lines.iter().enumerate() {
-            if line.len() > 300 {
+            if line.len() > MAX_LINE_LENGTH {
                 issues.push(LintIssue {
                     code: "L005".to_string(),
-                    message: format!("Línea muy larga ({} chars)", line.len()),
+                    message: format!("Línea muy larga ({} chars, max: {})", line.len(), MAX_LINE_LENGTH),
                     file: file_path.clone(),
                     line: Some(idx + 1),
                     severity: LintSeverity::Warning,

@@ -287,8 +287,10 @@ impl LinksCommand {
         }
 
         let target_name = target.split('/').next_back().unwrap_or(target);
+        // FIX #31: Normalizar escaped pipes antes del split
+        let target_name = target_name.replace("\\|", "|");
         // Remover pipe alias [[doc|alias]] -> doc
-        let target_name = target_name.split('|').next().unwrap_or(target_name);
+        let target_name = target_name.split('|').next().unwrap_or(&target_name);
         // FP-02 FIX: Remover fragmento anchor [[doc#section]] -> doc
         let target_name = target_name.split('#').next().unwrap_or(target_name).trim();
 
