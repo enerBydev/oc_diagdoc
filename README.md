@@ -70,6 +70,7 @@ cargo install --path .
 ```
 
 ### Requisitos
+
 - Rust 1.75+
 - Cargo
 
@@ -99,9 +100,10 @@ oc_diagdoc export --format html --output ./export
 
 ---
 
-## 📖 Comandos CLI
+## 📖 Comandos CLI (30)
 
 ### Analíticos
+
 | Comando | Descripción |
 |---------|-------------|
 | `verify` | Verificación integral (21 fases) |
@@ -109,8 +111,11 @@ oc_diagdoc export --format html --output ./export
 | `tree` | Árbol jerárquico visual |
 | `search` | Búsqueda en contenido y metadata |
 | `deps` | Análisis de dependencias |
+| `links` | Análisis de enlaces internos/externos |
+| `dashboard` | Interfaz TUI interactiva para visualizar issues |
 
 ### Diagnóstico
+
 | Comando | Descripción |
 |---------|-------------|
 | `lint` | Validación de formato Markdown |
@@ -118,23 +123,40 @@ oc_diagdoc export --format html --output ./export
 | `coverage` | Cobertura de contenido (palabras) |
 | `trace` | Trazabilidad documento→requisito |
 | `audit` | Auditoría forense YAML |
+| `report` | Generación de reportes |
+| `diff` | Comparar estados del proyecto |
 
 ### Modificación
+
 | Comando | Descripción |
 |---------|-------------|
+| `fix` | Corregir anomalías estructurales (fechas, hashes, tablas) |
 | `sync` | Sincronizar metadatos y fechas |
 | `batch` | Operaciones en lote |
-| `gen` | Generación automática |
+| `gen` | Generación automática de documentos |
 | `export` | Exportación multi-formato |
+| `compress` | Compilar documentación en archivo único |
 
 ### Gestión
+
 | Comando | Descripción |
 |---------|-------------|
 | `init` | Inicializar proyecto nuevo |
 | `migrate` | Migración entre versiones |
 | `snapshot` | Crear snapshot del estado |
 | `restore` | Restaurar desde snapshot |
+| `archive` | Archivar documentos obsoletos |
 | `ci` | Integración CI/CD |
+
+### Utilidades
+
+| Comando | Descripción |
+|---------|-------------|
+| `module` | Operaciones sobre módulos |
+| `watch` | Observar cambios en tiempo real |
+| `template` | Gestión de plantillas |
+| `readme` | Generar README automático |
+| `help` | Ayuda extendida |
 
 ---
 
@@ -154,6 +176,7 @@ Estos flags están disponibles para todos los comandos:
 ## 🔧 Flags Avanzados por Comando
 
 ### `verify`
+
 | Flag | Descripción |
 |------|-------------|
 | `--progress` | Mostrar barra de progreso interactiva |
@@ -162,6 +185,7 @@ Estos flags están disponibles para todos los comandos:
 | `--strict` | Fallar en cualquier warning |
 
 ### `batch`
+
 | Flag | Descripción |
 |------|-------------|
 | `--progress` | Mostrar barra de progreso |
@@ -169,6 +193,7 @@ Estos flags están disponibles para todos los comandos:
 | `--dry-run` | Simular sin modificar archivos |
 
 ### `search`
+
 | Flag | Descripción |
 |------|-------------|
 | `--fuzzy` | Búsqueda aproximada tolerante a errores |
@@ -177,12 +202,14 @@ Estos flags están disponibles para todos los comandos:
 | `--format <FMT>` | Formato de salida (text/json/table) |
 
 ### `stats`
+
 | Flag | Descripción |
 |------|-------------|
 | `--cache` | Usar caché para estadísticas |
 | `--heatmap` | Generar heatmap de cobertura |
 
 ### `tree`
+
 | Flag | Descripción |
 |------|-------------|
 | `--root <ID>` | Nodo raíz para visualización (matching flexible) |
@@ -192,24 +219,46 @@ Estos flags están disponibles para todos los comandos:
 | `--depth <N>` | Profundidad máxima del árbol |
 
 ### `lint`
+
 | Flag | Descripción |
 |------|-------------|
 | `--show-fixes` | Mostrar sugerencias de corrección detalladas |
 | `--fix` | Aplicar correcciones automáticamente |
 
+### `fix`
+
+| Flag | Descripción |
+|------|-------------|
+| `--dates` | Sincronizar campo last_updated con fecha del filesystem |
+| `--hashes` | Recalcular campo content_hash basado en contenido actual |
+| `--tables` | Corregir tablas de contenido (columna Nietos) |
+| `--dry-run` | Modo dry-run: mostrar cambios sin aplicar |
+| `-v, --verbose` | Mostrar detalles de cada corrección |
+
+### `dashboard`
+
+| Flag | Descripción |
+|------|-------------|
+| `-f, --filter` | Filtro inicial: all, errors, warnings, fixable |
+| `--quick` | Ejecutar verificación rápida |
+| `-p, --path` | Ruta al directorio de datos |
+
 ### `compress`
+
 | Flag | Descripción |
 |------|-------------|
 | `--preview` | Mostrar output sin escribir archivo |
 | `--pdf` | Generar versión PDF (requiere pandoc) |
 
 ### `sync`
+
 | Flag | Descripción |
 |------|-------------|
 | `--force` | Forzar actualización de todas las fechas |
 | Estadísticas extendidas: `hashes_initialized`, `hashes_updated` |
 
 ### `deps`
+
 | Flag | Descripción |
 |------|-------------|
 | Reporte detallado de huérfanos: `reason`, `invalid_parent` |
