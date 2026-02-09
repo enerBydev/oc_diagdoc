@@ -843,18 +843,27 @@ impl LintCommand {
         issues
     }
     
-    /// Helper: Cuenta archivos que inician con el prefijo dado
+    /// Helper: Cuenta archivos que son descendientes numéricos del prefijo dado.
+    /// BUGFIX L013: Ahora usa regex para excluir archivos padre (e.g., "1.1. identidad.md")
+    /// Solo cuenta archivos donde el ID es seguido por un dígito (1.1.0, 1.1.1, etc.)
     fn count_descendants(&self, data_dir: &std::path::Path, prefix: &str) -> usize {
         use std::fs;
+        use regex::Regex;
         
-        let pattern = format!("{}.", prefix); // e.g., "3.1.7." para buscar "3.1.7.*"
+        // Patrón: prefijo seguido de punto y dígito (e.g., "1.1" -> matchea "1.1.0", "1.1.1")
+        // NO matchea "1.1. identidad" porque después del punto NO hay dígito
+        let pattern = format!(r"^{}\.(\d+)", regex::escape(prefix));
+        let re = match Regex::new(&pattern) {
+            Ok(r) => r,
+            Err(_) => return 0,
+        };
         
         if let Ok(entries) = fs::read_dir(data_dir) {
             entries
                 .filter_map(|e| e.ok())
                 .filter(|e| {
                     let name = e.file_name().to_string_lossy().to_string();
-                    name.starts_with(&pattern) && name.ends_with(".md")
+                    name.ends_with(".md") && re.is_match(&name)
                 })
                 .count()
         } else {

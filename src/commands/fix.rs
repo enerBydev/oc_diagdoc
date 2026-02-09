@@ -121,9 +121,22 @@ impl FixCommand {
     }
 
     /// Cuenta descendientes de un ID dado.
+    /// BUGFIX L013: Ahora usa regex para contar solo descendientes numéricos.
+    /// Cuenta TODOS los descendientes (hijos, nietos, bisnietos) cuyo ID empiece con prefix.digit
+    /// Excluye archivos padre como "1.1. identidad" porque después del punto NO hay dígito
     fn count_descendants(id: &str, all_ids: &[String]) -> usize {
-        let prefix = format!("{}.", id);
-        all_ids.iter().filter(|other| other.starts_with(&prefix)).count()
+        use regex::Regex;
+        
+        // Patrón: id seguido de punto y dígito (sin $ para incluir todos los descendientes)
+        // "1.1" matchea "1.1.0", "1.1.1", "1.1.7.2", etc.
+        // NO matchea "1.1. identidad" (después del punto hay espacio, no dígito)
+        let pattern = format!(r"^{}\.(\d+)", regex::escape(id));
+        let re = match Regex::new(&pattern) {
+            Ok(r) => r,
+            Err(_) => return 0,
+        };
+        
+        all_ids.iter().filter(|other| re.is_match(other)).count()
     }
 
     /// Corrige los valores de Nietos en tablas de contenido de un archivo.
@@ -307,8 +320,20 @@ mod tests {
             "2".to_string(),
         ];
 
+        // BUGFIX L013: Ahora cuenta TODOS los descendientes numéricos recursivamente
+        // "1" tiene 4 descendientes: 1.1, 1.2, 1.2.1, 1.2.2
+        // NO cuenta archivos padre como "1. algo" (espacio después del punto)
         assert_eq!(FixCommand::count_descendants("1", &all_ids), 4); // 1.1, 1.2, 1.2.1, 1.2.2
         assert_eq!(FixCommand::count_descendants("1.2", &all_ids), 2); // 1.2.1, 1.2.2
         assert_eq!(FixCommand::count_descendants("2", &all_ids), 0);
+        
+        // Test adicional: No contar archivo padre (espacio después del punto)
+        let ids_with_parent = vec![
+            "1.1".to_string(),       // Padre (no debe contarse porque no empieza con "1.1.")
+            "1.1.0".to_string(),     // Descendiente
+            "1.1.1".to_string(),     // Descendiente
+            "1.1.1.2".to_string(),   // Descendiente anidado
+        ];
+        assert_eq!(FixCommand::count_descendants("1.1", &ids_with_parent), 3); // 1.1.0, 1.1.1, 1.1.1.2
     }
 }
