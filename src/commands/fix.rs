@@ -52,6 +52,14 @@ pub struct FixCommand {
     #[arg(long)]
     pub tables: bool,
 
+    /// FIX#1: Sincronizar fechas YAML con filesystem.
+    #[arg(long, help = "Sincronizar campo last_updated con fecha del filesystem")]
+    pub dates: bool,
+
+    /// FIX#2: Recalcular hashes de contenido.
+    #[arg(long, help = "Recalcular campo content_hash basado en el contenido actual")]
+    pub hashes: bool,
+
     /// Modo dry-run: mostrar cambios sin aplicar.
     #[arg(long)]
     pub dry_run: bool,
@@ -95,6 +103,20 @@ impl FixCommand {
                     }
                 }
             }
+        }
+
+        // FIX#1: Sincronizar fechas YAML con filesystem
+        if self.dates {
+            let (fixed, updated) = self.fix_dates(&files, self.dry_run, self.verbose)?;
+            result.files_fixed += fixed;
+            result.rows_updated += updated;
+        }
+
+        // FIX#2: Recalcular hashes de contenido
+        if self.hashes {
+            let (fixed, updated) = self.fix_hashes(&files, self.dry_run, self.verbose)?;
+            result.files_fixed += fixed;
+            result.rows_updated += updated;
         }
 
         Ok(result)
@@ -247,6 +269,193 @@ impl FixCommand {
     fn extract_id_from_wikilink(cell: &str) -> Option<String> {
         let clean = cell.trim().trim_start_matches("[[").trim_end_matches("]]");
         Self::extract_id(clean)
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // FIX#1: SINCRONIZAR FECHAS YAML CON FILESYSTEM
+    // ═══════════════════════════════════════════════════════════════════════
+
+    /// FIX#1: Sincroniza el campo last_updated en YAML con la fecha del filesystem.
+    fn fix_dates(
+        &self,
+        files: &[PathBuf],
+        dry_run: bool,
+        verbose: bool,
+    ) -> OcResult<(usize, usize)> {
+        use chrono::{Local, TimeZone};
+        use std::time::UNIX_EPOCH;
+
+        let mut files_fixed = 0;
+        let mut fields_updated = 0;
+
+        for path in files {
+            let content = match fs::read_to_string(path) {
+                Ok(c) => c,
+                Err(_) => continue,
+            };
+
+            let re = match Regex::new(r#"last_updated:\s*\"?([^\"\n]+)\"?"#) {
+                Ok(r) => r,
+                Err(_) => continue,
+            };
+
+            if let Some(cap) = re.captures(&content) {
+                let old_date = cap.get(1).map(|m| m.as_str()).unwrap_or("");
+                
+                let metadata = match fs::metadata(path) {
+                    Ok(m) => m,
+                    Err(_) => continue,
+                };
+                
+                let mtime = match metadata.modified() {
+                    Ok(t) => t,
+                    Err(_) => continue,
+                };
+                
+                let duration = match mtime.duration_since(UNIX_EPOCH) {
+                    Ok(d) => d,
+                    Err(_) => continue,
+                };
+                
+                let fs_secs = duration.as_secs() as i64;
+                let dt = match Local.timestamp_opt(fs_secs, 0).single() {
+                    Some(d) => d,
+                    None => continue,
+                };
+                
+                let new_date = dt.format("%Y-%m-%d %H:%M").to_string();
+                
+                // Parsear fecha YAML para comparar en segundos
+                let yaml_secs = Self::parse_date_to_secs(old_date).unwrap_or(0) as i64;
+                let diff_secs = (fs_secs - yaml_secs).abs();
+                let diff_hours = diff_secs / 3600;
+                
+                // Solo corregir si la diferencia es >24 horas
+                if diff_hours >= 24 {
+                    let new_content = content.replace(
+                        &cap[0],
+                        &format!("last_updated: \"{}\"", new_date)
+                    );
+                    
+                    if !dry_run {
+                        fs::write(path, &new_content)?;
+                    }
+                    
+                    files_fixed += 1;
+                    fields_updated += 1;
+                    
+                    if verbose {
+                        let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("?");
+                        let mode = if dry_run { "[DRY-RUN] " } else { "" };
+                        println!("📅 {}{}: {} → {} ({}h drift)", mode, name, old_date, new_date, diff_hours);
+                    }
+                }
+            }
+        }
+
+        Ok((files_fixed, fields_updated))
+    }
+
+    /// Parsea fecha YAML a segundos desde UNIX_EPOCH.
+    fn parse_date_to_secs(date_str: &str) -> Option<u64> {
+        use chrono::{Local, NaiveDateTime, NaiveDate, TimeZone};
+        
+        let cleaned = date_str.trim().trim_matches('"');
+        
+        // Formato: "YYYY-MM-DD HH:MM:SS"
+        if let Ok(naive) = NaiveDateTime::parse_from_str(cleaned, "%Y-%m-%d %H:%M:%S") {
+            if let Some(local_dt) = Local.from_local_datetime(&naive).single() {
+                return Some(local_dt.timestamp() as u64);
+            }
+        }
+        
+        // Formato: "YYYY-MM-DD HH:MM"
+        if let Ok(naive) = NaiveDateTime::parse_from_str(cleaned, "%Y-%m-%d %H:%M") {
+            if let Some(local_dt) = Local.from_local_datetime(&naive).single() {
+                return Some(local_dt.timestamp() as u64);
+            }
+        }
+        
+        // Formato: "YYYY-MM-DD" (assume midnight)
+        if let Ok(naive) = NaiveDate::parse_from_str(cleaned, "%Y-%m-%d") {
+            let naive_dt = naive.and_hms_opt(0, 0, 0)?;
+            if let Some(local_dt) = Local.from_local_datetime(&naive_dt).single() {
+                return Some(local_dt.timestamp() as u64);
+            }
+        }
+        
+        None
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // FIX#2: RECALCULAR HASHES DE CONTENIDO
+    // ═══════════════════════════════════════════════════════════════════════
+
+    /// FIX#2: Recalcula el campo content_hash basado en el contenido actual.
+    fn fix_hashes(
+        &self,
+        files: &[PathBuf],
+        dry_run: bool,
+        verbose: bool,
+    ) -> OcResult<(usize, usize)> {
+        use sha2::{Digest, Sha256};
+
+        let mut files_fixed = 0;
+        let mut fields_updated = 0;
+
+        for path in files {
+            let content = match fs::read_to_string(path) {
+                Ok(c) => c,
+                Err(_) => continue,
+            };
+
+            let re = match Regex::new(r#"content_hash:\s*\"?([^\"\n]+)\"?"#) {
+                Ok(r) => r,
+                Err(_) => continue,
+            };
+
+            if let Some(cap) = re.captures(&content) {
+                let old_hash = cap.get(1).map(|m| m.as_str()).unwrap_or("");
+                
+                let content_for_hash: String = content
+                    .lines()
+                    .filter(|l| {
+                        !l.starts_with("last_updated:") &&
+                        !l.starts_with("content_hash:") &&
+                        !l.starts_with("file_create:")
+                    })
+                    .collect::<Vec<_>>()
+                    .join("\n");
+                
+                let mut hasher = Sha256::new();
+                hasher.update(content_for_hash.as_bytes());
+                let new_hash = format!("{:x}", hasher.finalize());
+                let new_hash = &new_hash[..16];
+                
+                if old_hash.trim() != new_hash {
+                    let new_content = content.replace(
+                        &cap[0],
+                        &format!("content_hash: \"{}\"", new_hash)
+                    );
+                    
+                    if !dry_run {
+                        fs::write(path, &new_content)?;
+                    }
+                    
+                    files_fixed += 1;
+                    fields_updated += 1;
+                    
+                    if verbose {
+                        let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("?");
+                        let mode = if dry_run { "[DRY-RUN] " } else { "" };
+                        let old_short = &old_hash[..8.min(old_hash.len())];
+                        println!("🔐 {}{}: {} → {}", mode, name, old_short, new_hash);
+                    }
+                }
+            }
+        }
+
+        Ok((files_fixed, fields_updated))
     }
 }
 

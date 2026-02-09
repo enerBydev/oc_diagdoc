@@ -42,6 +42,7 @@ pub mod lifetimes;
 pub mod metrics;
 pub mod path;
 pub mod status;
+pub mod severity;  // ADD#2
 
 // Re-exports
 pub use breadcrumb::Breadcrumb;
@@ -54,4 +55,5 @@ pub use lifetimes::{CacheEntry, DocumentView, LazyString, SplitBorrow};
 pub use metrics::{Counters, CoverageStats};
 pub use path::DataPath;
 pub use status::DocumentStatus;
+pub use severity::{Severity, Issue};  // ADD#2
 
