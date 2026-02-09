@@ -437,14 +437,51 @@ impl LintCommand {
     }
 
     /// Regla: Headers no duplicados.
+    /// RFC-FIX: Implementado tracking de estado in_code_block para ignorar 
+    /// shebangs, comentarios y contenido dentro de bloques de código fenced.
     fn rule_duplicate_headers(&self, file_path: &PathBuf, lines: &[&str]) -> Vec<LintIssue> {
         use std::collections::HashMap;
         let mut issues = Vec::new();
         let mut seen: HashMap<String, usize> = HashMap::new();
+        let mut in_code_block = false; // Track estado de fenced code blocks
 
         for (idx, line) in lines.iter().enumerate() {
-            if line.starts_with('#') && !line.starts_with("```") {
-                let header = line.trim_start_matches('#').trim().to_lowercase();
+            let trimmed = line.trim();
+            
+            // Toggle estado de code blocks (soporta ``` y ~~~)
+            if trimmed.starts_with("```") || trimmed.starts_with("~~~") {
+                in_code_block = !in_code_block;
+                continue;
+            }
+            
+            // Ignorar contenido dentro de code blocks
+            if in_code_block {
+                continue;
+            }
+            
+            // Solo procesar headers Markdown válidos (# seguido de espacio y texto)
+            if line.starts_with('#') {
+                // Un header válido tiene al menos un # seguido de espacio
+                let hash_count = line.chars().take_while(|c| *c == '#').count();
+                let remaining = &line[hash_count..];
+                
+                // Skip si no hay espacio después de los # (ej: #hashtag, #!/bin/bash)
+                if !remaining.starts_with(' ') {
+                    continue;
+                }
+                
+                let header = remaining.trim().to_lowercase();
+                
+                // Protección adicional contra shebangs (edge case)
+                if header.starts_with('!') {
+                    continue;
+                }
+                
+                // Skip headers vacíos
+                if header.is_empty() {
+                    continue;
+                }
+                
                 if let Some(prev_line) = seen.get(&header) {
                     issues.push(LintIssue {
                         code: "L007".to_string(),
