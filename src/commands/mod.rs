@@ -90,7 +90,7 @@ pub enum Command {
 
     // Sistema
     Readme(readme::ReadmeCommand),
-    Help(help::HelpCommand),
+
     Dashboard(dashboard::DashboardCommand),  // ADD#1: TUI Dashboard
 }
 
@@ -126,7 +126,7 @@ pub fn execute(cmd: Command, cli: &CliConfig) -> anyhow::Result<()> {
         Command::Archive(args) => archive::run(args, cli),
         Command::Ci(args) => ci::run(args, cli),
         Command::Readme(args) => readme::run(args, cli),
-        Command::Help(args) => help::run(args, cli),
+
         Command::Dashboard(args) => dashboard::run(args, cli),  // ADD#1
     }
 }

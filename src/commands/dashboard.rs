@@ -214,6 +214,12 @@ pub struct DashboardCommand {
     /// Ejecutar verificación rápida
     #[arg(long)]
     pub quick: bool,
+
+    /// Patrones de exclusión. Ejemplo: --exclude "_summaries"
+    #[arg(long, value_name = "PATTERN")]
+    pub exclude: Vec<String>,
+
+
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -386,20 +392,22 @@ fn handle_events(app: &mut DashboardApp) -> io::Result<bool> {
 pub fn run(cmd: DashboardCommand, cli: &crate::commands::CliConfig) -> anyhow::Result<()> {
     use crate::commands::verify::VerifyCommand;
     
-    let data_dir = PathBuf::from(&cli.data_dir);
+    
+    let data_dir = cmd.path.clone().unwrap_or_else(|| PathBuf::from(&cli.data_dir));
     
     // Ejecutar verificación
     let verify_cmd = VerifyCommand {
         path: Some(data_dir.clone()),
         phase: None,
+        quiet: false,
         quick: cmd.quick,
         json: false,
-        quiet: true,
-        schema_strict: false,
         progress: false,
         cache: false,
         root_only: false,
-        exclude: vec![],
+        exclude: cmd.exclude.clone(),
+        schema_strict: false,
+
     };
     
     let result = verify_cmd.run(&data_dir)?;

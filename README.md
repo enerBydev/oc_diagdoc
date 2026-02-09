@@ -242,6 +242,7 @@ Estos flags están disponibles para todos los comandos:
 | `-f, --filter` | Filtro inicial: all, errors, warnings, fixable |
 | `--quick` | Ejecutar verificación rápida |
 | `-p, --path` | Ruta al directorio de datos |
+| `--exclude <PATTERN>` | Patrones de exclusión (ej: `_summaries`) |
 
 ### `compress`
 

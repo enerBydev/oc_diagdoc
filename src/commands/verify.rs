@@ -265,6 +265,11 @@ fn parse_phase(input: &str) -> Option<u8> {
 }
 
 impl VerifyCommand {
+    /// Helper to get files for verification using current options
+    fn get_files(&self, data_dir: &PathBuf) -> Vec<PathBuf> {
+        Self::get_md_files_with_options(data_dir, self.root_only, &self.exclude)
+    }
+
     /// Ejecuta la verificación completa.
     pub fn run(&self, data_dir: &PathBuf) -> OcResult<VerificationResult> {
         let start = Instant::now();
@@ -443,7 +448,7 @@ impl VerifyCommand {
     // ═══════════════════════════════════════════════════════════════════════
 
     fn phase_file_count(&self, phase: &mut VerificationPhase, data_dir: &PathBuf) {
-        let files = Self::get_md_files(data_dir);
+        let files = self.get_files(data_dir);
         let count = files.len();
 
         if count == 0 {
@@ -457,7 +462,7 @@ impl VerifyCommand {
     // ═══════════════════════════════════════════════════════════════════════
 
     fn phase_yaml_validation(&self, phase: &mut VerificationPhase, data_dir: &PathBuf) {
-        let files = Self::get_md_files(data_dir);
+        let files = self.get_files(data_dir);
 
         for path in files {
             if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
@@ -500,7 +505,7 @@ impl VerifyCommand {
     // ═══════════════════════════════════════════════════════════════════════
 
     fn phase_unique_ids(&self, phase: &mut VerificationPhase, data_dir: &PathBuf) {
-        let files = Self::get_md_files(data_dir);
+        let files = self.get_files(data_dir);
         let mut id_files: HashMap<String, Vec<String>> = HashMap::new();
 
         for path in files {
@@ -528,7 +533,7 @@ impl VerifyCommand {
     // ═══════════════════════════════════════════════════════════════════════
 
     fn phase_valid_parents(&self, phase: &mut VerificationPhase, data_dir: &PathBuf) {
-        let files = Self::get_md_files(data_dir);
+        let files = self.get_files(data_dir);
 
         // First pass: build id_map
         let mut id_map: HashMap<String, PathBuf> = HashMap::new();
@@ -566,7 +571,7 @@ impl VerifyCommand {
     // ═══════════════════════════════════════════════════════════════════════
 
     fn phase_breadcrumbs(&self, phase: &mut VerificationPhase, data_dir: &PathBuf) {
-        let files = Self::get_md_files(data_dir);
+        let files = self.get_files(data_dir);
 
         for path in files {
             if let Ok(content) = fs::read_to_string(&path) {
@@ -595,7 +600,7 @@ impl VerifyCommand {
     // ═══════════════════════════════════════════════════════════════════════
 
     fn phase_types(&self, phase: &mut VerificationPhase, data_dir: &PathBuf) {
-        let files = Self::get_md_files(data_dir);
+        let files = self.get_files(data_dir);
 
         for path in files {
             if let Ok(content) = fs::read_to_string(&path) {
@@ -618,7 +623,7 @@ impl VerifyCommand {
     // ═══════════════════════════════════════════════════════════════════════
 
     fn phase_status(&self, phase: &mut VerificationPhase, data_dir: &PathBuf) {
-        let files = Self::get_md_files(data_dir);
+        let files = self.get_files(data_dir);
 
         for path in files {
             if let Ok(content) = fs::read_to_string(&path) {
@@ -641,7 +646,7 @@ impl VerifyCommand {
     // ═══════════════════════════════════════════════════════════════════════
 
     fn phase_dates_sync(&self, phase: &mut VerificationPhase, data_dir: &PathBuf) {
-        let files = Self::get_md_files(data_dir);
+        let files = self.get_files(data_dir);
 
         for path in files {
             // Skip contextualizador
@@ -721,7 +726,7 @@ impl VerifyCommand {
     // ═══════════════════════════════════════════════════════════════════════
 
     fn phase_internal_links(&self, phase: &mut VerificationPhase, data_dir: &PathBuf) {
-        let files = Self::get_md_files(data_dir);
+        let files = self.get_files(data_dir);
 
         // Build file map for fuzzy matching
         let mut file_map: HashMap<String, String> = HashMap::new();
@@ -789,7 +794,7 @@ impl VerifyCommand {
     // ═══════════════════════════════════════════════════════════════════════
 
     fn phase_embeds(&self, phase: &mut VerificationPhase, data_dir: &PathBuf) {
-        let files = Self::get_md_files(data_dir);
+        let files = self.get_files(data_dir);
         use crate::core::patterns::RE_OBSIDIAN_EMBED;
         let embed_re = &*RE_OBSIDIAN_EMBED;
 
@@ -823,7 +828,7 @@ impl VerifyCommand {
     // ═══════════════════════════════════════════════════════════════════════
 
     fn phase_images(&self, phase: &mut VerificationPhase, data_dir: &PathBuf) {
-        let files = Self::get_md_files(data_dir);
+        let files = self.get_files(data_dir);
         use crate::core::patterns::RE_IMAGE;
         let img_re = &*RE_IMAGE;
 
@@ -857,7 +862,7 @@ impl VerifyCommand {
     // ═══════════════════════════════════════════════════════════════════════
 
     fn phase_code_blocks(&self, phase: &mut VerificationPhase, data_dir: &PathBuf) {
-        let files = Self::get_md_files(data_dir);
+        let files = self.get_files(data_dir);
 
         for path in files {
             if let Ok(content) = fs::read_to_string(&path) {
@@ -885,7 +890,7 @@ impl VerifyCommand {
     // ═══════════════════════════════════════════════════════════════════════
 
     fn phase_mermaid(&self, phase: &mut VerificationPhase, data_dir: &PathBuf) {
-        let files = Self::get_md_files(data_dir);
+        let files = self.get_files(data_dir);
         use crate::core::patterns::RE_MERMAID;
         let mermaid_re = &*RE_MERMAID;
 
@@ -922,7 +927,7 @@ impl VerifyCommand {
     // ═══════════════════════════════════════════════════════════════════════
 
     fn phase_tables(&self, phase: &mut VerificationPhase, data_dir: &PathBuf) {
-        let files = Self::get_md_files(data_dir);
+        let files = self.get_files(data_dir);
 
         for path in files {
             if let Ok(content) = fs::read_to_string(&path) {
@@ -975,7 +980,7 @@ impl VerifyCommand {
     // ═══════════════════════════════════════════════════════════════════════
 
     fn phase_headings(&self, phase: &mut VerificationPhase, data_dir: &PathBuf) {
-        let files = Self::get_md_files(data_dir);
+        let files = self.get_files(data_dir);
 
         for path in files {
             if let Ok(content) = fs::read_to_string(&path) {
@@ -1024,7 +1029,7 @@ impl VerifyCommand {
     // ═══════════════════════════════════════════════════════════════════════
 
     fn phase_min_content(&self, phase: &mut VerificationPhase, data_dir: &PathBuf) {
-        let files = Self::get_md_files(data_dir);
+        let files = self.get_files(data_dir);
         const MIN_WORDS: usize = 50;
 
         for path in files {
@@ -1063,7 +1068,7 @@ impl VerifyCommand {
     // ═══════════════════════════════════════════════════════════════════════
 
     fn phase_placeholders(&self, phase: &mut VerificationPhase, data_dir: &PathBuf) {
-        let files = Self::get_md_files(data_dir);
+        let files = self.get_files(data_dir);
 
         const PLACEHOLDER_PATTERNS: &[&str] = &[
             "TBD",
@@ -1104,7 +1109,7 @@ impl VerifyCommand {
     // ═══════════════════════════════════════════════════════════════════════
 
     fn phase_duplicates(&self, phase: &mut VerificationPhase, data_dir: &PathBuf) {
-        let files = Self::get_md_files(data_dir);
+        let files = self.get_files(data_dir);
 
         // Group files by title
         let mut title_map: HashMap<String, Vec<String>> = HashMap::new();
@@ -1140,7 +1145,7 @@ impl VerifyCommand {
     // ═══════════════════════════════════════════════════════════════════════
 
     fn phase_orphans(&self, phase: &mut VerificationPhase, data_dir: &PathBuf) {
-        let files = Self::get_md_files(data_dir);
+        let files = self.get_files(data_dir);
 
         // Build set of all references
         let mut all_refs: HashSet<String> = HashSet::new();
@@ -1193,7 +1198,7 @@ impl VerifyCommand {
     // ═══════════════════════════════════════════════════════════════════════
 
     fn phase_children_count(&self, phase: &mut VerificationPhase, data_dir: &PathBuf) {
-        let files = Self::get_md_files(data_dir);
+        let files = self.get_files(data_dir);
 
         // Build parent -> children map
         let mut children_of: HashMap<String, Vec<String>> = HashMap::new();
@@ -1244,7 +1249,7 @@ impl VerifyCommand {
     fn phase_hash_integrity(&self, phase: &mut VerificationPhase, data_dir: &PathBuf) {
         use sha2::{Digest, Sha256};
         
-        let files = Self::get_md_files(data_dir);
+        let files = self.get_files(data_dir);
 
         for path in files {
             if let Ok(content) = fs::read_to_string(&path) {
