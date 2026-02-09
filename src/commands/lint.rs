@@ -379,9 +379,17 @@ impl LintCommand {
     }
 
     /// Regla: Líneas no muy largas.
+    /// RFC-FIX: Ahora ignora archivos en subdirectorios auxiliares (ej: _summaries/_prompts/)
     fn rule_line_length(&self, file_path: &PathBuf, lines: &[&str]) -> Vec<LintIssue> {
         // FIX #33: Aumentar umbral de 300 a 800 chars
         const MAX_LINE_LENGTH: usize = 800;
+        
+        // RFC-FIX: Skip archivos en subdirectorios auxiliares (directorios que empiezan con _)
+        let path_str = file_path.to_string_lossy();
+        if path_str.contains("/_") || path_str.contains("\\_") {
+            // Archivos en directorios como _summaries/, _prompts/, _templates/ son auxiliares
+            return Vec::new();
+        }
         
         let mut issues = Vec::new();
         for (idx, line) in lines.iter().enumerate() {
@@ -401,9 +409,11 @@ impl LintCommand {
 
     /// Regla: Code blocks deben tener lenguaje especificado.
     /// RFC-28: Fixed bug - ahora distingue aperturas vs cierres de code blocks
+    /// RFC-FIX: Ahora detecta placeholders de documentación (code blocks con contenido de ejemplo)
     fn rule_code_block_language(&self, file_path: &PathBuf, lines: &[&str]) -> Vec<LintIssue> {
         let mut issues = Vec::new();
         let mut in_code_block = false;
+        let mut block_start_idx = 0;
 
         for (idx, line) in lines.iter().enumerate() {
             let trimmed = line.trim();
@@ -413,19 +423,23 @@ impl LintCommand {
                 if !in_code_block {
                     // APERTURA de code block
                     in_code_block = true;
+                    block_start_idx = idx;
                     
                     // Verificar si tiene lenguaje especificado después de ```
                     let after_backticks = trimmed.trim_start_matches('`');
                     if after_backticks.is_empty() {
-                        // Solo "```" sin lenguaje = problema real
-                        issues.push(LintIssue {
-                            code: "L006".to_string(),
-                            message: "Code block sin lenguaje especificado".to_string(),
-                            file: file_path.clone(),
-                            line: Some(idx + 1),
-                            severity: LintSeverity::Hint,
-                            fixable: false,
-                        });
+                        // Solo "```" sin lenguaje - verificar si es placeholder
+                        let is_placeholder = self.is_documentation_placeholder(lines, idx);
+                        if !is_placeholder {
+                            issues.push(LintIssue {
+                                code: "L006".to_string(),
+                                message: "Code block sin lenguaje especificado".to_string(),
+                                file: file_path.clone(),
+                                line: Some(idx + 1),
+                                severity: LintSeverity::Hint,
+                                fixable: false,
+                            });
+                        }
                     }
                 } else {
                     // CIERRE de code block - NO reportar L006
@@ -434,6 +448,41 @@ impl LintCommand {
             }
         }
         issues
+    }
+    
+    /// Detecta si un code block es un placeholder/TODO de documentación.
+    /// RFC-FIX: Un placeholder típicamente contiene:
+    /// - Headers markdown (##)
+    /// - Tablas (|)
+    /// - Code blocks internos (```)
+    /// - Separadores (---)
+    fn is_documentation_placeholder(&self, lines: &[&str], start: usize) -> bool {
+        let mut has_headers = false;
+        let mut has_tables = false;
+        let mut has_inner_blocks = false;
+        let mut has_separators = false;
+        
+        // Analizar máximo 50 líneas después del inicio
+        let end = lines.len().min(start + 50);
+        
+        for i in (start + 1)..end {
+            let line = lines[i].trim();
+            
+            // Si encontramos el cierre del bloque, terminamos
+            if line == "```" {
+                break;
+            }
+            
+            // Detectar características típicas de documentación
+            if line.starts_with("##") { has_headers = true; }
+            if line.starts_with('|') && line.ends_with('|') { has_tables = true; }
+            if line.starts_with("```") && line.len() > 3 { has_inner_blocks = true; }
+            if line == "---" { has_separators = true; }
+        }
+        
+        // Es placeholder si tiene 2+ características de documentación estructurada
+        let score = has_headers as u8 + has_tables as u8 + has_inner_blocks as u8 + has_separators as u8;
+        score >= 2
     }
 
     /// Regla: Headers no duplicados.
@@ -605,6 +654,7 @@ impl LintCommand {
 
     /// L011: Detecta separadores duplicados en tablas.
     /// Una tabla válida solo tiene UN separador |---| después del header.
+    /// RFC-FIX: Ahora ignora contenido dentro de fenced code blocks (ASCII art, mockups).
     fn rule_table_double_separator(&self, file_path: &PathBuf, lines: &[&str]) -> Vec<LintIssue> {
         use crate::core::patterns::{RE_TABLE_ROW, RE_TABLE_SEPARATOR};
         let table_row = &*RE_TABLE_ROW;
@@ -612,20 +662,38 @@ impl LintCommand {
 
         let mut issues = Vec::new();
         let mut i = 0;
+        let mut in_code_block = false; // Track estado de fenced code blocks
         
         while i < lines.len() {
             let trimmed = lines[i].trim();
             
+            // Toggle estado de code blocks (soporta ``` y ~~~)
+            if trimmed.starts_with("```") || trimmed.starts_with("~~~") {
+                in_code_block = !in_code_block;
+                i += 1;
+                continue;
+            }
+            
+            // Skip contenido dentro de code blocks (ASCII art, mockups, ejemplos)
+            if in_code_block {
+                i += 1;
+                continue;
+            }
+            
             // Detectar inicio de tabla (línea que es una fila de tabla)
             if table_row.is_match(trimmed) && !separator_row.is_match(trimmed) {
                 // Estamos en una tabla
-                let table_start = i;
                 let mut separator_count = 0;
                 let mut first_separator_line = 0;
                 
                 // Recorrer la tabla completa
                 while i < lines.len() {
                     let line_trimmed = lines[i].trim();
+                    
+                    // Verificar si entramos en code block dentro de tabla (edge case)
+                    if line_trimmed.starts_with("```") || line_trimmed.starts_with("~~~") {
+                        break; // Salir del análisis de tabla
+                    }
                     
                     // ¿Es fila de tabla o separador?
                     if separator_row.is_match(line_trimmed) {
