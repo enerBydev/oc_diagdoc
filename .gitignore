@@ -46,3 +46,6 @@ benchmarks/results/
 # Large binary files
 *.pdf
 compiled.pdf
+
+# Web project (separate repo: enerBydev/diag_doc)
+diag_doc_web/
